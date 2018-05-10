@@ -7,7 +7,6 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.text.ParseException;
 import java.util.Iterator;
 import java.util.Set;
 
@@ -38,6 +37,7 @@ public class Main {
                     System.out.println("Connected to " + client.getRemoteAddress());
                     System.out.println("Now registering to a selector");
                     //register for reading
+                    selector.wakeup();
                     client.register(selector, SelectionKey.OP_READ);
                 }
 
@@ -62,7 +62,7 @@ public class Main {
                                 //TODO get a distinct buffer for every socket
                                 //ByteBuffer buffer = ByteBuffer.allocate(140);
 
-                                Message incomingMessage = new Message(26);
+                                SimpleMessage incomingMessage = new SimpleMessage(26);
                                 try {
                                     //supposed that this try should handle a single message
                                     //System.out.println("starting to read from it");
@@ -73,7 +73,7 @@ public class Main {
                                     System.out.println("Thread ID: " + incomingMessage.threadID());
                                     System.out.println("Date: " + incomingMessage.getDate());
                                     ByteBuffer b = (ByteBuffer) incomingMessage.body.flip();
-                                    System.out.println("Message: ");
+                                    System.out.println("SimpleMessage: ");
                                     while (b.hasRemaining()) {
                                         System.out.print((char) b.get());
                                     }
@@ -121,8 +121,7 @@ public class Main {
                                     e.printStackTrace();
 //                            } catch(InterruptedException e){
 //                                e.printStackTrace();
-                                } catch (ParseException e) {
-                                    e.printStackTrace();
+
                                 } finally {
                                     System.out.println("\ndestroying thread");
                                     //set the key ops again so that it get's picked up by the server loop
