@@ -1,12 +1,13 @@
 package com.company;
 
 import java.io.IOException;
-import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 public class SelectionThread extends ShutDownThread {
 
@@ -23,6 +24,9 @@ public class SelectionThread extends ShutDownThread {
      * Each socket that needs to be registered on the
      */
     private ConcurrentLinkedQueue<SocketChannel> registerQueue;
+
+    private Function<SelectionKey, Runnable> readable;
+    private Function<SelectionKey, Runnable> writable;
 
 
     public SelectionThread(Selector selector, ExecutorService handlers) {
@@ -81,6 +85,7 @@ public class SelectionThread extends ShutDownThread {
         if (selected > 0) {
             for (SelectionKey key : selector.selectedKeys()) {
                 if (key.isReadable()) {
+
                     //TODO call an executable handler for reading from the key
                 }
                 if (key.isWritable()) {
@@ -90,11 +95,11 @@ public class SelectionThread extends ShutDownThread {
         }
     }
 
-    public void onReading(){
-
+    public void onReading(Function<SelectionKey, Runnable> function) {
+        this.readable = function;
     }
 
-    public void onWrting(){
-
+    public void onWriting(Function<SelectionKey, Runnable> function) {
+        this.writable = function;
     }
 }
