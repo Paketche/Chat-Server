@@ -10,8 +10,18 @@ import java.util.concurrent.ExecutorService;
 
 public class SelectionThread extends ShutDownThread {
 
+    /**
+     * Used for selecting channel sockets for reading an writing
+     */
     private Selector selector;
+    /**
+     * Used for dispatching each socket handle to new thread
+     * while keeping the active threads to a certain number
+     */
     private ExecutorService handlers;
+    /**
+     * Each socket that needs to be registered on the
+     */
     private ConcurrentLinkedQueue<SocketChannel> registerQueue;
 
 
@@ -40,7 +50,6 @@ public class SelectionThread extends ShutDownThread {
     }
 
     /**
-     *
      * @param socket
      */
     public void registerSocket(SocketChannel socket) {
@@ -79,5 +88,13 @@ public class SelectionThread extends ShutDownThread {
                 }
             }
         }
+    }
+
+    public void onReading(){
+
+    }
+
+    public void onWrting(){
+
     }
 }

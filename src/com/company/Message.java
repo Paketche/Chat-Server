@@ -5,12 +5,6 @@ import java.nio.channels.SocketChannel;
 
 public interface Message {
 
-    /**
-     * Sets the date time format of the message
-     *
-     * @param dateFormat of the message
-     */
-    void setDateFormat(String dateFormat);
 
     /**
      * Reads a message from a sender
@@ -28,4 +22,6 @@ public interface Message {
      * @throws IOException if something occurs while sending
      */
     void sendTo(SocketChannel receiver) throws IOException;
+
+    long getDate();
 }

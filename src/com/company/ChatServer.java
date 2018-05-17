@@ -17,6 +17,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Deque;
 import java.util.TreeMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -55,7 +56,8 @@ public class ChatServer extends ShutDownThread {
      * be attached to the selector and read from.
      * The key would be the user'd ID
      */
-    private TreeMap<Integer, Deque<SimpleMessage>> activeUserToMessageQueue;
+    private TreeMap<Integer, SelectionKey> activeUserToMessageQueue;
+
 
     /**
      * creates a new NIO Chat server
