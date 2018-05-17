@@ -7,7 +7,6 @@ import java.nio.channels.SocketChannel;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 public class SelectionThread extends ShutDownThread {
 
@@ -29,6 +28,13 @@ public class SelectionThread extends ShutDownThread {
     private Function<SelectionKey, Runnable> writable;
 
 
+    /**
+     * create a new Selection thread that selects {@link SocketChannel}s and hands the selected keys off
+     * to specified readers and riders
+     *
+     * @param selector
+     * @param handlers
+     */
     public SelectionThread(Selector selector, ExecutorService handlers) {
         this.setName("Selector thread");
         this.selector = selector;
@@ -49,7 +55,6 @@ public class SelectionThread extends ShutDownThread {
             //if the selector is broken
             this.log(e);
             e.printStackTrace();
-            //TODO put a logging method here
         }
     }
 
@@ -84,13 +89,12 @@ public class SelectionThread extends ShutDownThread {
         //else the selector what probably woken up for registration
         if (selected > 0) {
             for (SelectionKey key : selector.selectedKeys()) {
-                if (key.isReadable()) {
+                if (key.isReadable())
+                    handlers.execute(readable.apply(key));
 
-                    //TODO call an executable handler for reading from the key
-                }
-                if (key.isWritable()) {
-                    //TODO call an executable handler for writing to the key
-                }
+                if (key.isWritable())
+                    handlers.execute(writable.apply(key));
+
             }
         }
     }

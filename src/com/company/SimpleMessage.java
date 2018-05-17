@@ -10,7 +10,6 @@ import java.util.Date;
 
 public class SimpleMessage implements Message {
 
-    public static final int DATE_FIELD_LENGTH = 19;
     public static final int HEADER_SIZE = 26;
 
     private ByteBuffer header;
@@ -48,15 +47,6 @@ public class SimpleMessage implements Message {
         threadID = header.getShort();
         sendDate = header.getLong();
 
-//
-//        //get the date time
-//        byte[] datebytes = new byte[DATE_FIELD_LENGTH];
-//        header.get(datebytes);
-//        try {
-//            sendDate = dateFormat.parse(new String(datebytes));
-//        } catch (ParseException e) {
-//            throw new IOException("SimpleMessage date has an incorrect format");
-//        }
         //now for the rest of the message
         body = ByteBuffer.allocate(this.messageLen);
         if (sender.read(body) < 0) {
