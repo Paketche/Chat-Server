@@ -1,23 +1,11 @@
 package com.company;
 
-import com.sun.xml.internal.bind.v2.TODO;
-
-import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Deque;
 import java.util.TreeMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -31,10 +19,7 @@ public class ChatServer extends ShutDownThread {
      * Socket for accepting new connections
      */
     private ServerSocketChannel serverSocket;
-    /**
-     * SimpleMessage creator, reader and writer
-     */
-    private Message messageGenerator;
+
     /**
      * Selector for receiving evens for being ready
      * for reading or writing
@@ -58,6 +43,11 @@ public class ChatServer extends ShutDownThread {
      */
     private TreeMap<Integer, SelectionKey> activeUserToMessageQueue;
 
+    /**
+     *
+     */
+    private ReaderFactory readers;
+
 
     /**
      * creates a new NIO Chat server
@@ -66,9 +56,9 @@ public class ChatServer extends ShutDownThread {
      * @param port    of the server
      * @param message used for generating new messages, reading incoming messages and writing scheduled ones
      */
-    public ChatServer(String address, int port, Message message) {
+    public ChatServer(String address, int port, ReaderFactory factory) {
         this.address = new InetSocketAddress(address, port);
-        this.messageGenerator = message;
+        readers = factory;
         //read it from an article
         workersNum = 2 * (Runtime.getRuntime().availableProcessors() - 1);
     }
@@ -85,6 +75,12 @@ public class ChatServer extends ShutDownThread {
                 Selector selector = Selector.open();
                 messageHandlers = Executors.newFixedThreadPool(workersNum);
                 selectionThread = new SelectionThread(selector, messageHandlers);
+
+                // provide on read and on write commands for the selector
+                selectionThread.onReading(readers::readFrom);
+                //TODO add a writing function
+                selectionThread.onWriting(null);
+
                 selectionThread.start();
 
                 SocketChannel client;
