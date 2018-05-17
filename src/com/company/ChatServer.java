@@ -57,18 +57,6 @@ public class ChatServer extends ShutDownThread {
      */
     private TreeMap<Integer, Deque<SimpleMessage>> activeUserToMessageQueue;
 
-
-    /**
-     * Path to the log file used to log crashes
-     */
-    private Path logFile;
-
-    /**
-     * Format of the date with which the server is going to work
-     */
-    private DateFormat dateFormat;
-
-
     /**
      * creates a new NIO Chat server
      *
@@ -83,20 +71,6 @@ public class ChatServer extends ShutDownThread {
         workersNum = 2 * (Runtime.getRuntime().availableProcessors() - 1);
     }
 
-    /**
-     * Designate a file to which server crashes would be logged
-     *
-     * @param path       of the log file
-     * @param dateFormat of the date of the crash
-     */
-    public void setCrashLogFile(String path, String dateFormat) {
-        this.logFile = Paths.get(path);
-        this.dateFormat = new SimpleDateFormat(dateFormat);
-    }
-
-    /**
-     * @throws IOException if an problem occurs when opening the selector
-     */
     public void run() {
         //try-catch for any kind of exception; it logs that exception
         try {
@@ -115,19 +89,7 @@ public class ChatServer extends ShutDownThread {
                 while (isRunning()) {
                     //accept a new client connection and register it to the selector
                     client = serverSocket.accept();
-                    client.configureBlocking(false);
-
-                    //wake up the selector so that a new socket could be registered
-                    //call the suspend/resume Selection methods so that the selector
-                    //doesn't go into selecting between the wake up and register
-                    //the part where the
-                    synchronized (selector) {
-                        selectionThread.suspendSelection();
-                        selector.wakeup();
-                        client.register(selector, SelectionKey.OP_READ, SelectionKey.OP_WRITE);
-                        selectionThread.resumeSelection();
-                        notifyAll();
-                    }
+                    selectionThread.registerSocket(client);
                 }
                 //TODO think of sending something like goodbye messages to all clients
 
@@ -138,25 +100,7 @@ public class ChatServer extends ShutDownThread {
                 selectionThread.join();
             }
         } catch (Exception e) {
-            //log server crashes if a log file is specified
-            if (logFile != null && Files.exists(logFile)) {
-                StringBuilder builder = new StringBuilder();
-                //get the time of the crash
-                builder
-                        .append(dateFormat.format(new Date()) + " ")
-                        .append(e.getMessage())
-                        .append(System.getProperty("line.separator"));
-
-                try {
-                    //append at the end of the file
-                    Files.write(logFile, builder.toString().getBytes(), StandardOpenOption.APPEND);
-                } catch (IOException e1) {
-                    // well i really don't know what to do here
-                    e1.printStackTrace();
-                }
-            }
+            this.log(e);
         }
     }
-
-
 }
