@@ -10,43 +10,18 @@ import java.util.Date;
 
 public class SimpleMessage implements Message {
 
-    public static final String DATE_FIELD_FORMAT = "yyyy-MM-dd hh:mm:ss";
     public static final int DATE_FIELD_LENGTH = 19;
+    public static final int HEADER_SIZE = 26;
 
-    private int headersize;
     private ByteBuffer header;
-    ByteBuffer body;
+    private ByteBuffer body;
 
-    int messageLen;
+    private MessageType messageType;
+    private int messageLen;
     private byte senderID;
     private short threadID;
+    private long sendDate;
 
-
-    private DateFormat dateFormat;
-    private Date sendDate;
-
-
-    /**
-     * Creates a new message
-     *
-     * @param headerSize
-     */
-    public SimpleMessage(int headerSize) {
-        //TODO find a way to extract a a length of the message from the message header as well as date and thread
-        this.headersize = headerSize;
-        this.dateFormat = new SimpleDateFormat(DATE_FIELD_FORMAT);
-    }
-
-
-    /**
-     * Sets the date time format of the message
-     *
-     * @param dateFormat of the message
-     */
-    @Override
-    public void setDateFormat(String dateFormat) {
-        this.dateFormat = new SimpleDateFormat(dateFormat);
-    }
 
     /**
      * Reads a message from a sender
@@ -59,7 +34,7 @@ public class SimpleMessage implements Message {
     @Override
     public void readFrom(SocketChannel sender) throws IOException {
 
-        header = ByteBuffer.allocate(headersize);
+        header = ByteBuffer.allocate(HEADER_SIZE);
         //while there is something to read from the buffer continue reading
         if (sender.read(header) < 0) {
             throw new IOException("SimpleMessage header not received");
@@ -67,24 +42,26 @@ public class SimpleMessage implements Message {
 
         //get data from header
         header.flip();
+        messageType = translate(header.get());
         messageLen = header.getInt();
         senderID = header.get();
         threadID = header.getShort();
+        sendDate = header.getLong();
 
-        //get the date time
-        byte[] datebytes = new byte[DATE_FIELD_LENGTH];
-        header.get(datebytes);
-        try {
-            sendDate = dateFormat.parse(new String(datebytes));
-        } catch (ParseException e) {
-            throw new IOException("SimpleMessage date has an incorrect format");
-        }
+//
+//        //get the date time
+//        byte[] datebytes = new byte[DATE_FIELD_LENGTH];
+//        header.get(datebytes);
+//        try {
+//            sendDate = dateFormat.parse(new String(datebytes));
+//        } catch (ParseException e) {
+//            throw new IOException("SimpleMessage date has an incorrect format");
+//        }
         //now for the rest of the message
         body = ByteBuffer.allocate(this.messageLen);
         if (sender.read(body) < 0) {
             throw new IOException("SimpleMessage body not received");
         }
-        //return 0;
     }
 
     /**
@@ -101,6 +78,10 @@ public class SimpleMessage implements Message {
         System.out.println("message sent");
     }
 
+    public MessageType type() {
+        return messageType;
+    }
+
     public byte senderID() {
         return senderID;
     }
@@ -109,7 +90,32 @@ public class SimpleMessage implements Message {
         return threadID;
     }
 
-    public String getDate() {
-        return this.dateFormat.format(this.sendDate);
+    public long getDate() {
+        return this.sendDate;
+    }
+
+    /**
+     * Returns a string representation of the contents of the message
+     *
+     * @return the message's contents
+     */
+    @Override
+    public String toString() {
+        return new String(body.array());
+    }
+
+    public MessageType translate(byte code) {
+        switch (code) {
+            case 0:
+                return MessageType.CONNECT;
+            case 1:
+                return MessageType.SEND;
+            case 2:
+                return MessageType.NEW_THREAD;
+            case 3:
+                return MessageType.DISCONNECT;
+            default:
+                return MessageType.UNKNOWN;
+        }
     }
 }
