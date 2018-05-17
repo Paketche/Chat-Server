@@ -11,12 +11,14 @@ import java.util.TreeMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 
-public class ReaderFactory implements Runnable {
+public class ReaderFactory {
     private final TreeMap<Integer, SelectionKey> mailBoxes;
     private Connection conn;
     private final PreparedStatement getParticipants;
     private final PreparedStatement saveMessage;
     private final PreparedStatement getID;
+    private final PreparedStatement createThread;
+    private final PreparedStatement getThreadID;
 
     public ReaderFactory(String connection, TreeMap<Integer, SelectionKey> mailBoxes) throws SQLException, ClassNotFoundException {
         this.mailBoxes = mailBoxes;
@@ -27,6 +29,9 @@ public class ReaderFactory implements Runnable {
         getParticipants = conn.prepareStatement("SELECT s_id FROM messages WHERE t_id = ? AND s_id != ?");
         saveMessage = conn.prepareStatement("INSERT INTO messages VALUES(?,?,?,?)");
         getID = conn.prepareStatement("SELECT u_id FROM usr= ? AND pas = ?");
+
+        createThread = conn.prepareStatement("INSERT INTO threads VALUES (?)");
+        getThreadID = conn.prepareStatement("SELECT t_id FROM threads WHERE t_name = ?");
     }
 
 
@@ -151,17 +156,27 @@ public class ReaderFactory implements Runnable {
         }
     }
 
-    private void createThread(SimpleMessage message) {
+    private void createThread(SimpleMessage message) throws SQLException {
+        //TODO get the thread name from the message
+        synchronized (createThread) {
+            try {
+                createThread.executeUpdate();
+            } catch (SQLException e) {
+                sendFailingMessage(message.senderID(), "Failed to create the thread");
+                e.printStackTrace();
+            }
+        }
+        synchronized (getThreadID) {
+            ResultSet rs = getThreadID.executeQuery();
+            rs.next();
+            int id = rs.getByte(1);
+            //Todo send a message to the client for id of the thread
+        }
 
 
     }
 
     private void sendFailingMessage(byte senderID, String message) {
-
-    }
-
-    @Override
-    public void run() {
-
+        //TODO implement this
     }
 }
