@@ -10,7 +10,6 @@ public interface Message {
      * Reads a message from a sender
      *
      * @param sender the {@link SocketChannel} that is sending this message
-     * @return something dk right now
      * @throws IOException if something occurs while receiving
      */
     void readFrom(SocketChannel sender) throws IOException;
@@ -23,5 +22,11 @@ public interface Message {
      */
     void sendTo(SocketChannel receiver) throws IOException;
 
+    MessageType getType();
+
     long getDate();
+
+    int getSenderID();
+
+    int getThreadID();
 }

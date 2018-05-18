@@ -6,6 +6,7 @@ import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
 public class SelectionThread extends ShutDownThread {
@@ -19,13 +20,16 @@ public class SelectionThread extends ShutDownThread {
      * while keeping the active threads to a certain number
      */
     private ExecutorService handlers;
+
     /**
      * Each socket that needs to be registered on the
      */
     private ConcurrentLinkedQueue<SocketChannel> registerQueue;
 
-    private Function<SelectionKey, Runnable> readable;
-    private Function<SelectionKey, Runnable> writable;
+    private Function<SelectionKey, Boolean> validator;
+
+    private BiFunction<SelectionKey, Integer, Runnable> readable;
+    private BiFunction<SelectionKey, Integer, Runnable> writable;
 
 
     /**
@@ -44,7 +48,6 @@ public class SelectionThread extends ShutDownThread {
 
 
     public void run() {
-
         try {
             while (isRunning()) {
                 registerSockets();
@@ -53,19 +56,24 @@ public class SelectionThread extends ShutDownThread {
             selector.close();
         } catch (IOException e) {
             //if the selector is broken
-            this.log(e);
+            this.logger().log(e);
             e.printStackTrace();
         }
     }
 
     /**
-     * @param socket
+     * Add a socket to be registered for reading from.
+     *
+     * @param socket to be registered
      */
     public void registerSocket(SocketChannel socket) {
         registerQueue.add(socket);
         selector.wakeup();
     }
 
+    /**
+     * Goes through the queue of waiting sockets and registers them
+     */
     private void registerSockets() {
         if (!registerQueue.isEmpty()) {
             for (SocketChannel chan : registerQueue) {
@@ -75,13 +83,18 @@ public class SelectionThread extends ShutDownThread {
                 } catch (IOException e) {
                     //ignore the failure of not registering a socket
                     //it shouldn't affect the rest of the program
-                    this.log(e);
+                    this.logger().log(e);
                     e.printStackTrace();
                 }
             }
         }
     }
 
+    /**
+     * Does the selection of any ready sockets
+     *
+     * @throws IOException if the selector is closed or an I/O exception occurs
+     */
     private void doSelection() throws IOException {
 
         int selected = selector.select();
@@ -89,21 +102,52 @@ public class SelectionThread extends ShutDownThread {
         //else the selector what probably woken up for registration
         if (selected > 0) {
             for (SelectionKey key : selector.selectedKeys()) {
-                if (key.isReadable())
-                    handlers.execute(readable.apply(key));
+                if (validator.apply(key)) {
+                    continue;
+                }
+
+                //take the ops so that only one worker thread could work with the selection key
+                int ops = key.interestOps();
+                key.interestOps(0);
 
                 if (key.isWritable())
-                    handlers.execute(writable.apply(key));
+                    handlers.execute(writable.apply(key, ops));
+                else if (key.isReadable())
+                    handlers.execute(readable.apply(key, ops));
+
 
             }
         }
     }
 
-    public void onReading(Function<SelectionKey, Runnable> function) {
+    /**
+     * Provide a functionality to check whether a selection key is valid
+     *
+     * @param validator functionality to check whether a selection key is valid
+     */
+    public void keyValidation(Function<SelectionKey, Boolean> validator) {
+        this.validator = validator;
+    }
+
+    /**
+     * Provide functionality for when a socket has been selected for reading.
+     * Have in mind that once the key is selected and validated all of it's ops are removed.
+     * So, it's up to the provided functionality to cancel the key or respecify the ops
+     *
+     * @param function functionality selecting a socket from which it could be read
+     */
+    public void onReading(BiFunction<SelectionKey, Integer, Runnable> function) {
         this.readable = function;
     }
 
-    public void onWriting(Function<SelectionKey, Runnable> function) {
+    /**
+     * Provide functionality for when a socket has been selected for writing.
+     * Have in mind that once the key is selected and validated all of it's ops are removed.
+     * So, it's up to the provided functionality to cancel the key or respecify the ops
+     *
+     * @param function functionality selecting a socket from which it could be read
+     */
+    public void onWriting(BiFunction<SelectionKey, Integer, Runnable> function) {
         this.writable = function;
     }
 }

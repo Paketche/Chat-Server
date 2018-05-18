@@ -8,7 +8,7 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
-public class SimpleMessage implements Message {
+public class SimpleMessage implements Message, MessageFactory {
 
     public static final int HEADER_SIZE = 26;
 
@@ -21,14 +21,46 @@ public class SimpleMessage implements Message {
     private short threadID;
     private long sendDate;
 
+    public SimpleMessage() {
+    }
+
+
+    private SimpleMessage(ByteBuffer header, ByteBuffer body) {
+        this.header = header;
+        this.body = body;
+    }
+
+    @Override
+    public Message newInstance(MessageType type, int senderID, int threadID, String contents) {
+        //type + length + senderID + threadID + date = size of message header in bytes
+
+        int messSize = contents.length();
+        ByteBuffer header = ByteBuffer.allocate(HEADER_SIZE);
+        ByteBuffer body = ByteBuffer.allocate(messSize);
+
+        body.put(contents.getBytes());
+
+        header.put(translate(type))
+                .putInt(messSize)
+                .put((byte) senderID)
+                .putShort((short) threadID)
+                .putLong(System.currentTimeMillis());
+
+
+        return new SimpleMessage(header, body);
+    }
+
+    @Override
+    public Message newInstance() {
+        return new SimpleMessage();
+    }
+
 
     /**
      * Reads a message from a sender
      *
      * @param sender the {@link SocketChannel} that is sending this message
-     * @return something dk right now
      * @throws IOException    if something occurs while receiving
-     * @throws ParseException if the sender send a datetime with the wrong format
      */
     @Override
     public void readFrom(SocketChannel sender) throws IOException {
@@ -68,18 +100,22 @@ public class SimpleMessage implements Message {
         System.out.println("message sent");
     }
 
-    public MessageType type() {
+    @Override
+    public MessageType getType() {
         return messageType;
     }
 
-    public byte senderID() {
+    @Override
+    public int getSenderID() {
         return senderID;
     }
 
-    public short threadID() {
+    @Override
+    public int getThreadID() {
         return threadID;
     }
 
+    @Override
     public long getDate() {
         return this.sendDate;
     }
@@ -94,7 +130,13 @@ public class SimpleMessage implements Message {
         return new String(body.array());
     }
 
-    public MessageType translate(byte code) {
+    /**
+     * Transform an ordinal type value to an enum
+     *
+     * @param code to be translated
+     * @return a corresponding enum value; {@link MessageType}.UNKNOWN if it's an unknown value;
+     */
+    private MessageType translate(byte code) {
         switch (code) {
             case 0:
                 return MessageType.CONNECT;
@@ -104,8 +146,20 @@ public class SimpleMessage implements Message {
                 return MessageType.NEW_THREAD;
             case 3:
                 return MessageType.DISCONNECT;
+            case 4:
+                return MessageType.FAILURE;
             default:
                 return MessageType.UNKNOWN;
         }
+    }
+
+    /**
+     * transforms a {@link MessageType} to its ordinal value;
+     *
+     * @param type to be translated
+     * @return value of type( in bytes since the protocol requires it to be)
+     */
+    private byte translate(MessageType type) {
+        return (byte) type.ordinal();
     }
 }

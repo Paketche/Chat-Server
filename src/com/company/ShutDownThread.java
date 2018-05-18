@@ -24,14 +24,10 @@ public class ShutDownThread extends Thread {
      * Boolean indicating the state of the server
      */
     private volatile boolean isRunning;
-    /**
-     * Path to log file
-     */
-    private Path logFile;
-    /**
-     * date time format of the exceptions logged into the logging file
-     */
-    private SimpleDateFormat dateFormat;
+
+
+    private Logger logger;
+
 
     /**
      * Returns true if the server is operational
@@ -56,32 +52,16 @@ public class ShutDownThread extends Thread {
      * @param dateFormat of the date of the crash
      */
     public void setCrashLogFile(String path, String dateFormat) {
-        this.logFile = Paths.get(path);
-        this.dateFormat = new SimpleDateFormat(dateFormat);
+        logger = new Logger(path, dateFormat);
+        isRunning = false;
     }
 
-    /**
-     * @param e
-     */
-    public void log(Exception e) {
-        if (logFile != null && Files.exists(logFile)) {
-            StringBuilder builder = new StringBuilder();
-            //get the time of the crash
-            builder
-                    .append(dateFormat.format(new Date()))
-                    .append(" ")
-                    .append(e.getMessage())
-                    .append(System.getProperty("line.separator"));
-
-            try {
-                //append at the end of the file
-                Files.write(logFile, builder.toString().getBytes(), StandardOpenOption.APPEND);
-            } catch (IOException e1) {
-                // well i really don't know what to do here
-                e1.printStackTrace();
-            }
-        }
+    public void start() {
+        isRunning = true;
+        super.start();
     }
 
-
+    protected Logger logger() {
+        return logger;
+    }
 }

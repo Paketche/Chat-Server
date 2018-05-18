@@ -6,5 +6,7 @@ public interface MessageFactory {
      *
      * @return a new message instance
      */
+    Message newInstance(MessageType type, int senderID, int threadID, String contents);
+
     Message newInstance();
 }
