@@ -60,18 +60,19 @@ public class ReaderFactory extends ShutDownThread {
     /**
      * Creates a new reader factory
      *
+     * @param drivers    of the JDBC connector
      * @param connection specifying the URL of the database
+     * @param user       name for identification
+     * @param password   for identification
      * @param factory    that creates new messages
      * @throws SQLException           if a database update could not be done
      * @throws ClassNotFoundException if the database drivers are not present
      */
-    public ReaderFactory(String connection, MessageFactory factory) throws SQLException, ClassNotFoundException {
+    public ReaderFactory(String drivers, String connection, String user, String password, MessageFactory factory) throws SQLException, ClassNotFoundException {
         messageFactory = factory;
 
-
-        //TODO provide the String
-        Class.forName("");
-        Connection conn = DriverManager.getConnection(connection);
+        Class.forName(drivers);
+        Connection conn = DriverManager.getConnection(connection, user, password);
 
         getParticipants = conn.prepareStatement("SELECT s_id FROM messages WHERE t_id = ? AND s_id != ?");
         saveMessage = conn.prepareStatement("INSERT INTO messages VALUES(?,?,?,?)");
@@ -171,6 +172,7 @@ public class ReaderFactory extends ShutDownThread {
         Message m = messageFactory.newInstance(message.getType(), id, message.getPassword(), message.getThreadID(), message.getThreadName(), message.getContents());
         mailBoxes.newMailBox(id, key);
         mailBoxes.putMessageInBox(id, m);
+        key.attach(new ConcurrentLinkedQueue<>());
     }
 
     /**
