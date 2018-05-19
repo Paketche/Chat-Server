@@ -8,13 +8,16 @@ import java.nio.file.StandardOpenOption;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
+/**
+ * A class used for saving errors onto a log file
+ */
 public class Logger {
     /**
      * Path to log file
      */
     private final Path logFile;
     /**
-     * date time format of the exceptions logged into the logging file
+     * Date time format of the exceptions logged into the logging file
      */
     private SimpleDateFormat dateFormat;
 
@@ -28,7 +31,6 @@ public class Logger {
         this.logFile = Paths.get(logFile);
         this.dateFormat = new SimpleDateFormat(dateFormat);
     }
-
 
     /**
      * Logs an exception

@@ -26,9 +26,14 @@ public class SelectionThread extends ShutDownThread {
      */
     private ConcurrentLinkedQueue<SocketChannel> registerQueue;
 
-    private Function<SelectionKey, Boolean> validator;
-
+    /**
+     * provides functionality in the case that the socket is ready to be read from
+     */
     private BiFunction<SelectionKey, Integer, Runnable> readable;
+
+    /**
+     * provides functionality in the case that the socket is ready to be written to
+     */
     private BiFunction<SelectionKey, Integer, Runnable> writable;
 
 
@@ -53,6 +58,8 @@ public class SelectionThread extends ShutDownThread {
                 registerSockets();
                 doSelection();
             }
+
+            handlers.shutdown();
             selector.close();
         } catch (IOException e) {
             //if the selector is broken
@@ -102,31 +109,27 @@ public class SelectionThread extends ShutDownThread {
         //else the selector what probably woken up for registration
         if (selected > 0) {
             for (SelectionKey key : selector.selectedKeys()) {
-                if (validator.apply(key)) {
+                if (!key.isValid()) {
                     continue;
                 }
 
-                //take the ops so that only one worker thread could work with the selection key
                 int ops = key.interestOps();
-                key.interestOps(0);
+                Runnable handler = null;
 
                 if (key.isWritable())
-                    handlers.execute(writable.apply(key, ops));
+                    handler = writable.apply(key, ops);
+
                 else if (key.isReadable())
-                    handlers.execute(readable.apply(key, ops));
+                    handler = readable.apply(key, ops);
 
-
+                if (handler != null) {
+                    //take the ops so that only one worker thread could work with the selection key
+                    //and it doesn't get selected again
+                    key.interestOps(0);
+                    handlers.execute(handler);
+                }
             }
         }
-    }
-
-    /**
-     * Provide a functionality to check whether a selection key is valid
-     *
-     * @param validator functionality to check whether a selection key is valid
-     */
-    public void keyValidation(Function<SelectionKey, Boolean> validator) {
-        this.validator = validator;
     }
 
     /**

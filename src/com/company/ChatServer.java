@@ -2,13 +2,15 @@ package com.company;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+/**
+ * A chat server that provides the functionality of reading from and writing to multiple clients
+ */
 public class ChatServer extends ShutDownThread {
 
     /**
@@ -30,6 +32,7 @@ public class ChatServer extends ShutDownThread {
      * Number of simultaneous worker threads
      */
     private int workersNum;
+
     /**
      * Each active user will have an entry in this map
      * Each active user will have a queue of scheduled messages.
@@ -39,18 +42,18 @@ public class ChatServer extends ShutDownThread {
      */
     private MailOffice activeUserToMessageQueue;
 
-
     /**
-     *
+     * Provides functionality when a socket is ready to be read from
      */
     private ReaderFactory readers;
 
-
+    /**
+     * Provides functionality when a socket is ready to be written to
+     */
     private WriterFactory writers;
 
-
     /**
-     * creates a new NIO Chat server
+     * Creates a new NIO Chat server
      *
      * @param address (IP) of the server
      * @param port    of the server
@@ -70,14 +73,14 @@ public class ChatServer extends ShutDownThread {
 
         //try-catch for any kind of exception; it logs that exception
         try {
-            //init server socket
             try {
+                //init server socket
                 serverSocket = ServerSocketChannel.open();
                 serverSocket.bind(this.address);
 
-
+                initReaderFactory();
+                initWriterFactory();
                 initSelector();
-
 
                 SocketChannel client;
                 while (isRunning()) {
@@ -86,11 +89,9 @@ public class ChatServer extends ShutDownThread {
                     selectionThread.registerSocket(client);
                 }
                 //TODO think of sending something like goodbye messages to all clients
-
-
             } finally {
                 //tear down the selection thread
-                selectionThread.interrupt();
+                selectionThread.shutDown();
                 selectionThread.join();
             }
         } catch (Exception e) {
@@ -98,15 +99,16 @@ public class ChatServer extends ShutDownThread {
         }
     }
 
+    /**
+     * Initializes the thread that is going to be doing the selection
+     *
+     * @throws IOException if the selector cannot be opened
+     */
     private void initSelector() throws IOException {
         //init executor service and selector thread
         Selector selector = Selector.open();
         ExecutorService messageHandlers = Executors.newFixedThreadPool(workersNum);
         selectionThread = new SelectionThread(selector, messageHandlers);
-
-        //the selector would schedule a new thread only if the key is not taken(don't wait to take it)
-        selectionThread.keyValidation(k ->
-                ((User) k.attachment()).tryTaking() != null);
 
         // provide on read and on write commands for the selector
         selectionThread.onReading(readers::readFrom);
@@ -115,22 +117,31 @@ public class ChatServer extends ShutDownThread {
         selectionThread.start();
     }
 
+    /**
+     * Initializes the reader factory
+     */
     private void initReaderFactory() {
         readers.setMailOffice(activeUserToMessageQueue);
         readers.onReadError((k, m, e) -> logger().log(e));
     }
 
+    /**
+     * Initializes the writer factory
+     */
     private void initWriterFactory() {
         writers.onWriteError(
+                //when a socket could not be written to it is assumed that the client is disconnected
+                // so we deallocate its resources
                 (key, message, exception) -> {
-                        User user = ((User) key.attachment());
-                        user.setInUse();
+                    try {
+                        key.channel().close();
 
                         key.cancel();
                         activeUserToMessageQueue.removeMailBox(key);
-                        user.terminate();
-
                         logger().log(exception);
+                    } catch (IOException e) {
+                        logger().log(e);
+                    }
                 }
         );
     }

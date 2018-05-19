@@ -3,61 +3,113 @@ package com.company;
 import java.nio.channels.SelectionKey;
 import java.util.*;
 
+/**
+ * Provides a mapping between an integer and a selection key. It is expected that to the selection key
+ */
 public class MailOffice {
     private final TreeMap<Integer, SelectionKey> boxNo_to_Key;
 
+    /**
+     * Creates a new mail office
+     */
     public MailOffice() {
         this.boxNo_to_Key = new TreeMap<>();
     }
 
 
-    public void newMailBox(int number, SelectionKey key) {
-        boxNo_to_Key.put(number, key);
+    /**
+     * Creates a new mail box and maps it to a key
+     *
+     * @param number of the mail box
+     * @param key    to the mail box
+     * @throws IllegalArgumentException if the selection key does not have a queue attached to it
+     */
+    public void newMailBox(int number, SelectionKey key) throws IllegalArgumentException {
+        if (!(key.attachment() instanceof Queue))
+            throw new IllegalArgumentException("The selection key doesn't have a queue attached to it");
+
+        synchronized (this) {
+            boxNo_to_Key.put(number, key);
+        }
     }
 
-    public boolean removeMailBox(int number) {
+    /**
+     * Removes a mail box
+     *
+     * @param number used for finding the box that needs to be removed
+     * @return true if there was a mail box before removal
+     */
+    public synchronized boolean removeMailBox(int number) {
         return boxNo_to_Key.remove(number) != null;
     }
 
-    public boolean removeMailBox(SelectionKey user) {
+    /**
+     * Removes a mail box
+     *
+     * @param key used for finding the box that needs to be removed
+     * @return true if there was a mail box before removal
+     */
+    public synchronized boolean removeMailBox(SelectionKey key) {
 
         //find the number of the selection key
         Optional<Integer> o = boxNo_to_Key.entrySet().stream()
-                .filter(e -> user.equals(e.getValue()))
+                .filter(e -> key.equals(e.getValue()))
                 .map(Map.Entry::getKey)
                 .findFirst();
 
         //remove if present
         Integer k;
         return (k = o.orElse(null)) != null && boxNo_to_Key.remove(k) != null;
-
     }
 
-    public boolean thereIsBoxOf(int numeber) {
-        return boxNo_to_Key.get(numeber) != null;
+    /**
+     * Returns true if the provided number is mapped to mail box
+     *
+     * @param number of the mail box
+     * @return true if there is a mail box for this number
+     */
+    public boolean thereIsBoxOf(int number) {
+        return boxNo_to_Key.get(number) != null;
     }
 
+    /**
+     * Put a message in multiple boxes
+     *
+     * @param message   that is to be put in the mail boxes
+     * @param receivers the mail box numbers of the receivers
+     */
     public void putMessageInBoxes(Message message, ArrayList<Integer> receivers) {
         receivers.stream()
                 .map(boxNo_to_Key::get)
                 .filter(Objects::nonNull)
                 .forEach(key ->
-                        putMessageInBoxes(key, message)
+                        putMessageInBox(key, message)
                 );
     }
 
-    public void putMessageInBoxes(int boxNo, Message message) {
-        putMessageInBoxes(boxNo_to_Key.get(boxNo), message);
+    /**
+     * Puts a message in a mail box
+     *
+     * @param boxNo   of the box that the message is going to be put in
+     * @param message that is to be put in a message box
+     * @throws IllegalArgumentException If the {@link SelectionKey} does not have a Queue<Message> attached to it
+     */
+    public void putMessageInBox(int boxNo, Message message) throws IllegalArgumentException {
+        putMessageInBox(boxNo_to_Key.get(boxNo), message);
     }
 
-    private void putMessageInBoxes(SelectionKey key, Message message) {
+    private void putMessageInBox(SelectionKey key, Message message) throws IllegalArgumentException {
         //add a message to the queue of the key and set it up for writing
-        User u = (User) key.attachment();
-        Queue<Message> mailBox = u.setInUse();
+        Queue<Message> mailBox;
+        try {
+            mailBox = (Queue<Message>) key.attachment();
+        } catch (ClassCastException e) {
+            throw new IllegalArgumentException("The attached queue doesn't hold instances of the Message class");
+        }
+
         mailBox.add(message);
 
         //turn on write interest
         key.interestOps(key.interestOps() | SelectionKey.OP_WRITE);
-        u.makeUsable();
     }
 }

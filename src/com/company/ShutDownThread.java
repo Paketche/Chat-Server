@@ -25,7 +25,9 @@ public class ShutDownThread extends Thread {
      */
     private volatile boolean isRunning;
 
-
+    /**
+     * This would log any errors that occur within the execution of the thread
+     */
     private Logger logger;
 
 
@@ -42,6 +44,7 @@ public class ShutDownThread extends Thread {
      * Sends a shutdown signal to the server
      */
     public void shutDown() {
+        this.interrupt();
         isRunning = false;
     }
 

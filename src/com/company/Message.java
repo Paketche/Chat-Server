@@ -2,17 +2,12 @@ package com.company;
 
 import java.io.IOException;
 import java.nio.channels.SocketChannel;
+import java.util.function.Consumer;
 
+/**
+ * Represents a immutable message
+ */
 public interface Message {
-
-
-    /**
-     * Reads a message from a sender
-     *
-     * @param sender the {@link SocketChannel} that is sending this message
-     * @throws IOException if something occurs while receiving
-     */
-    void readFrom(SocketChannel sender) throws IOException;
 
     /**
      * Sends the message to a receiving socket
@@ -22,11 +17,52 @@ public interface Message {
      */
     void sendTo(SocketChannel receiver) throws IOException;
 
+    /**
+     * Returns the {@link MessageType} of the message
+     *
+     * @return type of the message
+     */
     MessageType getType();
 
+    /**
+     * Returns a time stamp of the message
+     *
+     * @return a time stamp of the message
+     */
     long getDate();
 
+    /**
+     * Returns an id of the sender
+     *
+     * @return
+     */
     int getSenderID();
 
+    /**
+     * Returns the password of the client
+     *
+     * @return the password of the client
+     */
+    String getPassword();
+
+    /**
+     * Returns an id of the message's thread
+     *
+     * @return an id of the message's thread
+     */
     int getThreadID();
+
+    /**
+     * Returns the name of a thread
+     *
+     * @return the name of a thread
+     */
+    String getThreadName();
+
+    /**
+     * Retrieves the contents of the message
+     *
+     * @return the contents of the message
+     */
+    String getContents();
 }
