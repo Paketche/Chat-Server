@@ -42,6 +42,10 @@ public class SimpleMessage implements Message, MessageFactory {
         body.mark();
     }
 
+    public SimpleMessage(){
+
+    }
+
     @Override
     public Message newInstance(MessageType type, int senderID, String pass, int threadID, String threadName, String contents) {
         // get the correct length of the body(thread name and password could be part of the body)
