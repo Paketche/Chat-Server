@@ -23,7 +23,9 @@ public class WriterFactory {
      */
     public Runnable writeTo(SelectionKey key, int keyOps) {
         return () -> {
-            System.out.println("Got a key to write to");
+            Thread.currentThread().setName("Writing message");
+            System.out.println("Got a key to write to " + Thread.currentThread().getName() + ". And it is valid" + key.isValid());
+
             //get a user's queue
             Queue<Message> queue = (Queue<Message>) key.attachment();
 
@@ -46,6 +48,7 @@ public class WriterFactory {
                 System.out.println("trying to poll");
                 while ((m = queue.poll()) != null) {
 
+                    System.out.println("Message is of type: " + m.getType() + ": " + m.getContents());
                     System.out.println("sending to channel");
                     synchronized (m) {
                         m.sendTo(socketChannel);
@@ -58,8 +61,13 @@ public class WriterFactory {
             } finally {
                 System.out.println("just wrote all messages and turning on ops except 'write'");
                 //turn off the writing ops since there are no messages to be written
-                key.interestOps(keyOps ^ SelectionKey.OP_WRITE);
-                key.selector().wakeup();
+                synchronized (key) {
+                    if (key.isValid()) {
+                        key.interestOps(keyOps & ~SelectionKey.OP_WRITE);
+                        System.out.println("Key ops: " + key.interestOps());
+                        key.selector().wakeup();
+                    }
+                }
             }
         };
     }

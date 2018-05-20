@@ -103,6 +103,8 @@ public class ReaderFactory extends ShutDownThread {
      */
     public Runnable readFrom(final SelectionKey key, final int keyOps) {
         return () -> {
+            Thread.currentThread().setName("Reading message:");
+
             SocketChannel socket = (SocketChannel) key.channel();
             Message message = null;
 
@@ -110,7 +112,7 @@ public class ReaderFactory extends ShutDownThread {
             try {
                 message = messageFactory.readFrom(socket);
                 System.out.println("new message is: " + message.getType());
-
+                Thread.currentThread().setName("Reading message: " + message.getType());
                 //get the proper handler
                 switch (message.getType()) {
                     case CONNECT:
@@ -136,10 +138,14 @@ public class ReaderFactory extends ShutDownThread {
             }
             System.out.println("redoing ops");
             //reset the ops
-            key.interestOps(key.interestOps() | keyOps);
-            System.out.println("The key is writable : " + key.interestOps() + key.isWritable());
-            System.out.println("waking up the selector");
-            key.selector().wakeup();
+            synchronized (key) {
+                if (key.isValid()) {
+                    key.interestOps(key.interestOps() | keyOps);
+                    System.out.println("The key is writable : " + key.interestOps() + key.isWritable());
+                    System.out.println("waking up the selector");
+                    key.selector().wakeup();
+                }
+            }
         };
     }
 
@@ -153,9 +159,9 @@ public class ReaderFactory extends ShutDownThread {
         System.out.println("disconnecting a user");
 //        Message m = messageFactory.newInstance(message.getType(), message.getSenderID(), message.getPassword(), message.getThreadID(), message.getThreadName(), "Goodbye");
 //        mailBoxes.putMessageInBox(m.getSenderID(), m);
+        System.out.println("!!!!!!!!!!!!!!!!!!!!!    Canceling key !!!!!!!!!!!!!!!!!!!!!!!!!!");
         mailBoxes.removeMailBox(message.getSenderID());
         key.channel().close();
-        key.cancel();
     }
 
     /**
@@ -205,6 +211,7 @@ public class ReaderFactory extends ShutDownThread {
         //get an id for the client
         try {
             synchronized (getID) {
+                System.out.println("id: " + message.getSenderID() + " password: " + message.getPassword());
                 getID.setInt(1, message.getSenderID());
                 getID.setString(2, message.getPassword());
                 rs = getID.executeQuery();
@@ -216,16 +223,22 @@ public class ReaderFactory extends ShutDownThread {
             }
         } catch (SQLException | IndexOutOfBoundsException e) {
             //In case the query fails or the client hasn't passed in the correct number of arguments
+            System.out.println("!!!!!!!!!!!!!!!!!!!!!    Canceling key !!!!!!!!!!!!!!!!!!!!!!!!!!");
+
             key.channel().close();
-            key.cancel();
             e.printStackTrace();
             throw e;
         }
 
-        //create a new mailbox for the client and put it with the mail boxes
-        mailBoxes.newMailBox(id, key);
         //now create a new ArrayDeque so that it gets attached to the selection key
         key.attach(new ConcurrentLinkedQueue<>());
+        //create a new mailbox for the client and put it with the mail boxes
+        mailBoxes.newMailBox(id, key);
+
+
+        //send the message with the id to the new thread
+        Message m = messageFactory.newInstance(MessageType.CONNECT, message.getSenderID(), message.getPassword(), message.getThreadID(), message.getThreadName(), "");
+        mailBoxes.putMessageInBox(message.getSenderID(), m);
     }
 
     /**
@@ -238,7 +251,7 @@ public class ReaderFactory extends ShutDownThread {
         System.out.println("relaying a message");
         int senderID = message.getSenderID();
         //check if the sender has identified himself
-        if (mailBoxes.thereIsBoxOf(senderID)) {
+        if (!mailBoxes.thereIsBoxOf(senderID)) {
             sendFailingMessage(senderID, "You haven't been connected yet");
             return;
         }
@@ -275,19 +288,22 @@ public class ReaderFactory extends ShutDownThread {
      */
     private void createThread(Message message) throws SQLException {
         System.out.println("creating a thread");
-        String threadName = message.getContents();
+        String threadName = message.getThreadName();
         boolean tryCreating = false;
         int threadID = 0;
 
         //first we see if the thread exists
         synchronized (getThreadID) {
             try {
+                System.out.println("searching for thread");
+                getThreadID.setString(1, message.getThreadName());
                 ResultSet rs = getThreadID.executeQuery();
 
                 rs.next();
                 threadID = rs.getByte(1);
                 rs.close();
             } catch (SQLException e) {
+                System.out.println("thread not found");
                 // the thread does not exist in the database
                 tryCreating = true;
             }
@@ -298,6 +314,7 @@ public class ReaderFactory extends ShutDownThread {
             try {
                 synchronized (createThread) {
                     //create it
+                    System.out.println("Creating new thread");
                     createThread.setString(1, threadName);
                     createThread.executeUpdate();
                     createThread.clearParameters();
@@ -307,6 +324,7 @@ public class ReaderFactory extends ShutDownThread {
                     rs.next();
                     threadID = rs.getInt(1);
                     rs.close();
+                    System.out.println("thread created");
                 }
             } catch (SQLException e) {
                 sendFailingMessage(message.getSenderID(), "Failed to create the thread");
@@ -317,12 +335,14 @@ public class ReaderFactory extends ShutDownThread {
 
         //save the message in the database
         int senderIDid = message.getSenderID();
-        saveMessage(senderIDid, threadID, message.getDate(), helloMess);
+
 
         //send the message with the id to the new thread
         Message m = messageFactory.newInstance(MessageType.NEW_THREAD, senderIDid, "", threadID, threadName, "");
         mailBoxes.putMessageInBox(senderIDid, m);
+        System.out.println("Thread id is: " + m.getThreadID());
 
+        saveMessage(senderIDid, threadID, message.getDate(), helloMess);
     }
 
     /**
@@ -356,10 +376,12 @@ public class ReaderFactory extends ShutDownThread {
      */
     private void saveMessage(int senderID, int threadID, long date, String contents) throws SQLException {
         synchronized (saveMessage) {
-            saveMessage.setInt(1, senderID);
-            saveMessage.setInt(2, threadID);
-            saveMessage.setDate(3, new Date(date));
-            saveMessage.setString(4, contents);
+
+            Timestamp sqlDate = new Timestamp(date);
+            saveMessage.setInt(1, threadID);
+            saveMessage.setInt(2, senderID);
+            saveMessage.setString(3, contents);
+            saveMessage.setTimestamp(4, sqlDate);
             saveMessage.executeUpdate();
             saveMessage.clearParameters();
         }

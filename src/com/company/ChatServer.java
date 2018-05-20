@@ -67,10 +67,12 @@ public class ChatServer extends ShutDownThread {
 
         //read it from an article
         workersNum = 2 * (Runtime.getRuntime().availableProcessors() - 1);
+        super.setName("Chat Server");
     }
 
     public void run() {
 
+        System.out.println("starting server");
         //try-catch for any kind of exception; it logs that exception
         try {
             try {
@@ -92,12 +94,17 @@ public class ChatServer extends ShutDownThread {
                     System.out.println("Registered the socket\n");
                 }
                 //TODO think of sending something like goodbye messages to all clients
+            } catch (IOException e) {
+                e.printStackTrace();
+                throw e;
             } finally {
                 //tear down the selection thread
                 selectionThread.shutDown();
                 selectionThread.join();
+                serverSocket.close();
             }
         } catch (Exception e) {
+            e.printStackTrace();
             this.logger().log(e);
         }
     }
@@ -140,6 +147,7 @@ public class ChatServer extends ShutDownThread {
                 // so we deallocate its resources
                 (key, message, exception) -> {
                     try {
+                        System.out.println("!!!!!!!!!!!!!!!!!!!!!    Canceling key !!!!!!!!!!!!!!!!!!!!!!!!!!");
                         key.channel().close();
 
                         key.cancel();

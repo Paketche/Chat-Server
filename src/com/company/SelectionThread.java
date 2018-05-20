@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
+import java.util.Iterator;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.function.BiFunction;
@@ -55,12 +56,13 @@ public class SelectionThread extends ShutDownThread {
     public void run() {
         System.out.println("Selection thread started");
         try {
-            for (int i = 0; i < 10; i++){
+            for (int i = 0; i < 10; i++) {
                 registerSockets();
                 doSelection();
             }
 //            while (isRunning()) {
-//
+//                registerSockets();
+//                doSelection();
 //            }
 
             handlers.shutdown();
@@ -86,9 +88,9 @@ public class SelectionThread extends ShutDownThread {
      * Goes through the queue of waiting sockets and registers them
      */
     private void registerSockets() {
-        System.out.println("there is " + registerQueue.size() + "sockets to register");
+        System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!there is " + registerQueue.size() + " sockets to register");
         if (!registerQueue.isEmpty()) {
-            System.out.println("registering new sockets");
+            System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!registering new sockets");
             SocketChannel chan;
             while ((chan = registerQueue.poll()) != null) {
                 try {
@@ -111,35 +113,42 @@ public class SelectionThread extends ShutDownThread {
      */
     private void doSelection() throws IOException {
 
-        System.out.println("now waiting for selection");
+        System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!now waiting for selection");
         int selected = selector.select();
 
         //else the selector what probably woken up for registration
         if (selected > 0) {
-            for (SelectionKey key : selector.selectedKeys()) {
+            Iterator<SelectionKey> iterator = selector.selectedKeys().iterator();
+            while (iterator.hasNext()) {
+
+                SelectionKey key = iterator.next();
+
                 if (!key.isValid()) {
                     continue;
                 }
-                System.out.println("got a valid key");
+                System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!got a valid key");
 
                 int ops = key.interestOps();
                 Runnable handler = null;
 
                 if (key.isWritable()) {
-                    System.out.println("which is writable");
+                    System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!which is writable");
                     handler = writable.apply(key, ops);
 
                 } else if (key.isReadable()) {
-                    System.out.println("which is readable");
+                    System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!which is readable");
                     handler = readable.apply(key, ops);
                 }
                 if (handler != null) {
                     //take the ops so that only one worker thread could work with the selection key
                     //and it doesn't get selected again
-                    System.out.println("removing ops and executing handle");
+                    System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!removing ops and executing handle");
                     key.interestOps(0);
                     handlers.execute(handler);
                 }
+
+                iterator.remove();
+                System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!The key is till valid " + key.isValid());
             }
         }
     }

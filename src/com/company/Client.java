@@ -9,100 +9,102 @@ import java.util.Date;
 import java.util.Scanner;
 
 public class Client {
+
+    private static String noContent = "";
+    private static int unknownThread = 0;
+
+    private int senderID = 0;
+    private int threadID = 0;
+    private SocketChannel socket;
+    private InetSocketAddress serverAddress;
+    private MessageFactory factory;
+
+
+    public Client(int id, InetSocketAddress serverAddr, MessageFactory mFact) {
+this.senderID = id;
+        this.serverAddress = serverAddr;
+        this.factory = mFact;
+    }
+
+    public void start() throws IOException {
+        socket = SocketChannel.open();
+
+    }
+
+    public void connect(String password) throws IOException {
+        socket.connect(serverAddress);
+        Message message = factory.newInstance(MessageType.CONNECT, senderID, password, unknownThread, noContent, noContent);
+        message.sendTo(socket);
+
+        message = factory.readFrom(socket);
+        System.out.println("IDs" + (message.getSenderID() == senderID ? "" : "don't") + " match");
+    }
+
+    public void createThread(String threadName) throws IOException {
+        Message message = factory.newInstance(MessageType.NEW_THREAD, senderID, noContent, unknownThread, threadName, noContent);
+        message.sendTo(socket);
+
+        //get the id of the thread
+        message = factory.readFrom(socket);
+        threadID = message.getThreadID();
+        System.out.println("New thread id is: " + threadID);
+    }
+
+    public void register(String password) throws IOException {
+        socket.connect(serverAddress);
+        Message message = factory.newInstance(MessageType.REGISTER, senderID, password, 0, "", "");
+        message.sendTo(socket);
+
+        //get response with id
+        message = factory.readFrom(socket);
+        senderID = message.getSenderID();
+        System.out.println("Sender ID: " + senderID);
+    }
+
+    public boolean isStillWorking() {
+        return socket.isOpen();
+    }
+
+    public void disconnect() throws IOException {
+        Message message = factory.newInstance(MessageType.DISCONNECT, senderID, noContent, unknownThread, noContent, noContent);
+        message.sendTo(socket);
+    }
+
+    public void stop() throws IOException {
+        socket.close();
+    }
+
+
     public static void main(String[] args) {
-        int headerSize = 31;
         Scanner input = new Scanner(System.in);
         MessageFactory factory = new SimpleMessage();
 
-        int senderID = 0;
-        int threadID = 0;
+        Client client = new Client(47, new InetSocketAddress("localhost", 8080), factory);
 
-        SocketChannel socket = null;
         try {
-            socket = SocketChannel.open();
-//            System.out.println("enter hostname");
-//            String hostname = input.nextLine();
-//            System.out.println("enter port number");
-//            int port = input.nextInt();
-            socket.connect(new InetSocketAddress("10.32.163.191", 8085));
-            System.out.println("connected");
 
-            System.out.println("Allocating buffer");
-            ByteBuffer buffer;
+            client.start();
+            System.out.println("connecting client");
+            client.connect("smtp");
 
-            Message r = factory.newInstance(MessageType.REGISTER, senderID, "smtp", threadID, "", "");
-            r.sendTo(socket);
+            System.out.println("creating a thread");
+            client.createThread("some dumbo");
 
-            Message uid = factory.readFrom(socket);
-            if (uid.getType() == MessageType.REGISTER) {
-                senderID = uid.getSenderID();
+            while (true) {
+                System.out.println("Enter message:");
+                String line = input.nextLine();
+                if (!client.isStillWorking() || line.equals("quit"))
+                    break;
             }
 
-            System.out.println("Client id is:" + senderID);
-
-            System.out.println("joining thread");
-            Message t = factory.newInstance(MessageType.NEW_THREAD, senderID, "smtp", 0, "some twat", "");
-            if (t.getType() == MessageType.NEW_THREAD) {
-                threadID = t.getThreadID();
-            }
-            System.out.println("thread id: " + threadID);
-//
-//            while (true) {
-//                String line = input.nextLine();
-//                if (!socket.isOpen() || line.equals("quit"))
-//                    break;
-//
-//                Message m = factory.newInstance(MessageType.REGISTER, threadID, "smtp", threadID, "", line);
-//                m.sendTo(socket);
-//
-//
-//                //System.out.println(line);
-////                buffer = ByteBuffer.allocate(headerSize + lineB.length);
-////
-////
-////                buffer.putInt(lineB.length);
-////                buffer.put((byte) 1);
-////                buffer.putShort((short) 2);
-////                buffer.put(new SimpleDateFormat("yyyy-MM-dd hh:mm:ss").format(new Date()).getBytes());
-////                buffer.put(lineB);
-////                buffer.flip();
-////                // System.out.println("buffer was loaded and flipped");
-////
-////                while (buffer.hasRemaining())
-////                    socket.write(buffer);
-////
-////                System.out.println("message sent. waiting for next message");
-////                buffer.clear();
-////                System.out.println("going to sleep");
-////                Thread.sleep(1000);
-////                System.out.println("woke up");
-////                socket.configureBlocking(false);
-////                int read = socket.read(buffer);
-////
-////                System.out.println("going to read now: " + read);
-////
-////                if (read > 0) {
-////                    buffer.flip();
-////
-////                    while (buffer.hasRemaining()) {
-////                        System.out.print((char) buffer.get());
-////                    }
-////                    buffer.clear();
-////                }
-//            }
+            System.out.println("disconnecting");
+            client.disconnect();
+            client.stop();
         } catch (IOException e) {
             System.out.println("Sorry something happened: " + e.getMessage());
-//        } catch (InterruptedException e) {
-//            e.printStackTrace();
-        } finally {
-            if (socket != null) {
-                try {
-                    socket.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
         }
         System.out.println("Bye.");
     }
+
+
 }

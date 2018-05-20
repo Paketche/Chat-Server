@@ -66,6 +66,7 @@ public class SimpleMessage implements Message, MessageFactory {
                 .putShort((short) threadID)
                 .putLong(System.currentTimeMillis());
 
+
         // fill in body
         ByteBuffer body = ByteBuffer.allocate(messSize);
         switch (type) {
