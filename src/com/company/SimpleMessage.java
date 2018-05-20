@@ -11,7 +11,7 @@ import java.util.function.Consumer;
  */
 public class SimpleMessage implements Message, MessageFactory {
 
-    private static final byte HEADER_SIZE = 26;
+    private static final byte HEADER_SIZE = 16;
     private static final byte PASSWORD_SIZE = 8;
     private static final byte THREAD_NAME_SIZE = 16;
 
@@ -39,10 +39,9 @@ public class SimpleMessage implements Message, MessageFactory {
     private SimpleMessage(ByteBuffer header, ByteBuffer body) {
         this.header = header;
         this.body = body;
-        body.mark();
     }
 
-    public SimpleMessage(){
+    public SimpleMessage() {
 
     }
 
@@ -71,10 +70,12 @@ public class SimpleMessage implements Message, MessageFactory {
         ByteBuffer body = ByteBuffer.allocate(messSize);
         switch (type) {
             case NEW_THREAD:
+                threadName = paddString(threadName, THREAD_NAME_SIZE);
                 body.put(threadName.getBytes());
                 break;
             case REGISTER:
             case CONNECT:
+                pass = paddString(pass, PASSWORD_SIZE);
                 body.put(pass.getBytes());
         }
         body.put(contents.getBytes());
@@ -103,30 +104,8 @@ public class SimpleMessage implements Message, MessageFactory {
         if (sender.read(body) < 0) {
             throw new IOException("SimpleMessage body not received");
         }
-        handleOptionals(getType());
 
-        //get them ready for reading from
-        header.flip();
-        body.reset();
-        return new SimpleMessage(body, header);
-    }
-
-    /**
-     * If a message has any optional values the content of the message is marked in the body buffer
-     *
-     * @param type
-     */
-    private void handleOptionals(MessageType type) {
-        //marks to where the content should be reset after every time the message is read
-        switch (type) {
-            case CONNECT:
-            case REGISTER:
-                body.position(PASSWORD_SIZE);
-                break;
-            case NEW_THREAD:
-                body.position(THREAD_NAME_SIZE);
-        }
-        body.mark();
+        return new SimpleMessage(header, body);
     }
 
     /**
@@ -137,8 +116,9 @@ public class SimpleMessage implements Message, MessageFactory {
      */
     @Override
     public void sendTo(SocketChannel receiver) throws IOException {
-        header.rewind();
-        body.reset();
+        header.flip();
+        body.flip();
+
         receiver.write(new ByteBuffer[]{header, body});
     }
 
@@ -161,7 +141,8 @@ public class SimpleMessage implements Message, MessageFactory {
     public String getPassword() {
         MessageType t = getType();
         if (t == MessageType.CONNECT || t == MessageType.REGISTER)
-            return stringFrom(pass, PASSWORD_SIZE);
+            //remove the padding of the password
+            return stringFrom(pass, PASSWORD_SIZE).trim();
 
         return null;
     }
@@ -180,7 +161,8 @@ public class SimpleMessage implements Message, MessageFactory {
     @Override
     public String getThreadName() {
         if (getType() == MessageType.NEW_THREAD) {
-            return stringFrom(threadName, THREAD_NAME_SIZE);
+            //remove the padding of the thread name
+            return stringFrom(threadName, THREAD_NAME_SIZE).trim();
         }
         return null;
     }
@@ -190,13 +172,18 @@ public class SimpleMessage implements Message, MessageFactory {
         return header.getLong(sendDate);
     }
 
+    /**
+     * Returns a string only if the message is a SEND message; Null otherwise
+     *
+     * @return a string if the message is of type SEND; null otherwise
+     */
     @Override
     public String getContents() {
-        body.reset();
-        //extract the contents skipping passwords and thread names;
-        int contentsSize = body.capacity() - body.position();
+        if (!(getType() == MessageType.SEND)) {
+            return "";
+        }
 
-        return stringFrom(body.position(), contentsSize);
+        return new String(body.array());
     }
 
     /**
@@ -231,7 +218,7 @@ public class SimpleMessage implements Message, MessageFactory {
      * @return value of type( in bytes since the protocol requires it to be)
      */
     private byte translate(MessageType type) {
-        return (byte) type.ordinal();
+        return (byte) (type.ordinal());
     }
 
     /**
@@ -242,9 +229,19 @@ public class SimpleMessage implements Message, MessageFactory {
      * @return a String representation of the slice
      */
     private String stringFrom(int position, int size) {
-        byte[] strInBytes = new byte[size];
         body.position(position);
+
+        byte[] strInBytes = new byte[size];
         body.get(strInBytes);
+
         return new String(strInBytes);
+    }
+
+    private String paddString(String tobepadded, int size) {
+        StringBuilder b = new StringBuilder(tobepadded);
+
+        while (b.length() < size) b.append(" ");
+
+        return b.toString();
     }
 }

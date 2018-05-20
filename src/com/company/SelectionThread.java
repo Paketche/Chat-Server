@@ -53,11 +53,15 @@ public class SelectionThread extends ShutDownThread {
 
 
     public void run() {
+        System.out.println("Selection thread started");
         try {
-            while (isRunning()) {
+            for (int i = 0; i < 10; i++){
                 registerSockets();
                 doSelection();
             }
+//            while (isRunning()) {
+//
+//            }
 
             handlers.shutdown();
             selector.close();
@@ -82,8 +86,11 @@ public class SelectionThread extends ShutDownThread {
      * Goes through the queue of waiting sockets and registers them
      */
     private void registerSockets() {
+        System.out.println("there is " + registerQueue.size() + "sockets to register");
         if (!registerQueue.isEmpty()) {
-            for (SocketChannel chan : registerQueue) {
+            System.out.println("registering new sockets");
+            SocketChannel chan;
+            while ((chan = registerQueue.poll()) != null) {
                 try {
                     chan.configureBlocking(false);
                     chan.register(selector, SelectionKey.OP_READ);
@@ -104,6 +111,7 @@ public class SelectionThread extends ShutDownThread {
      */
     private void doSelection() throws IOException {
 
+        System.out.println("now waiting for selection");
         int selected = selector.select();
 
         //else the selector what probably woken up for registration
@@ -112,19 +120,23 @@ public class SelectionThread extends ShutDownThread {
                 if (!key.isValid()) {
                     continue;
                 }
+                System.out.println("got a valid key");
 
                 int ops = key.interestOps();
                 Runnable handler = null;
 
-                if (key.isWritable())
+                if (key.isWritable()) {
+                    System.out.println("which is writable");
                     handler = writable.apply(key, ops);
 
-                else if (key.isReadable())
+                } else if (key.isReadable()) {
+                    System.out.println("which is readable");
                     handler = readable.apply(key, ops);
-
+                }
                 if (handler != null) {
                     //take the ops so that only one worker thread could work with the selection key
                     //and it doesn't get selected again
+                    System.out.println("removing ops and executing handle");
                     key.interestOps(0);
                     handlers.execute(handler);
                 }

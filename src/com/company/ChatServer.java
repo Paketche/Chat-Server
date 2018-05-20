@@ -85,8 +85,11 @@ public class ChatServer extends ShutDownThread {
                 SocketChannel client;
                 while (isRunning()) {
                     //accept a new client connection and register it to the selector
+                    System.out.println("waiting for connections");
+
                     client = serverSocket.accept();
                     selectionThread.registerSocket(client);
+                    System.out.println("Registered the socket\n");
                 }
                 //TODO think of sending something like goodbye messages to all clients
             } finally {
@@ -115,12 +118,14 @@ public class ChatServer extends ShutDownThread {
         selectionThread.onWriting(writers::writeTo);
 
         selectionThread.start();
+        System.out.println("starting selector");
     }
 
     /**
      * Initializes the reader factory
      */
     private void initReaderFactory() {
+        System.out.println("filling reader");
         readers.setMailOffice(activeUserToMessageQueue);
         readers.onReadError((k, m, e) -> logger().log(e));
     }
@@ -129,6 +134,7 @@ public class ChatServer extends ShutDownThread {
      * Initializes the writer factory
      */
     private void initWriterFactory() {
+        System.out.println("filling writer");
         writers.onWriteError(
                 //when a socket could not be written to it is assumed that the client is disconnected
                 // so we deallocate its resources

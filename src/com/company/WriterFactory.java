@@ -5,7 +5,7 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.Queue;
 
-public class WriterFactory{
+public class WriterFactory {
 
     /**
      * A consumer that will be called when an error occurs while writing
@@ -23,16 +23,19 @@ public class WriterFactory{
      */
     public Runnable writeTo(SelectionKey key, int keyOps) {
         return () -> {
+            System.out.println("Got a key to write to");
             //get a user's queue
-            Queue<Message> queue =(Queue<Message>) key.attachment();
+            Queue<Message> queue = (Queue<Message>) key.attachment();
 
             //if the user has been terminated do nothing more
             //other classes will take care of it
-            if (queue != null) {
+            if (queue == null) {
+                System.out.println("there is no queue");
                 return;
             }
 
 
+            System.out.println("getting channel");
             SocketChannel socketChannel = (SocketChannel) key.channel();
             Message m = null;
 
@@ -40,17 +43,23 @@ public class WriterFactory{
             try {
                 //stop if the queue is empty
 
+                System.out.println("trying to poll");
                 while ((m = queue.poll()) != null) {
-                    synchronized (m){
+
+                    System.out.println("sending to channel");
+                    synchronized (m) {
                         m.sendTo(socketChannel);
                     }
+                    System.out.println("just wrote a message");
                 }
             } catch (IOException e) {
                 onWriteError.accept(key, m, e);
                 e.printStackTrace();
             } finally {
+                System.out.println("just wrote all messages and turning on ops except 'write'");
                 //turn off the writing ops since there are no messages to be written
                 key.interestOps(keyOps ^ SelectionKey.OP_WRITE);
+                key.selector().wakeup();
             }
         };
     }

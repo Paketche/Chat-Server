@@ -109,7 +109,9 @@ public class MailOffice {
 
         mailBox.add(message);
 
+        System.out.println("setting ops to writable");
         //turn on write interest
         key.interestOps(key.interestOps() | SelectionKey.OP_WRITE);
+        System.out.println("The key is writable : "+ key.interestOps());
     }
 }

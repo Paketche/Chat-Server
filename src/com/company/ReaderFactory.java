@@ -73,15 +73,16 @@ public class ReaderFactory extends ShutDownThread {
 
         Class.forName(drivers);
         Connection conn = DriverManager.getConnection(connection, user, password);
+        System.out.println("Got connection");
 
-        getParticipants = conn.prepareStatement("SELECT s_id FROM messages WHERE t_id = ? AND s_id != ?");
+        getParticipants = conn.prepareStatement("SELECT uid FROM messages WHERE tid = ? AND uid != ?");
         saveMessage = conn.prepareStatement("INSERT INTO messages VALUES(?,?,?,?)");
-        getID = conn.prepareStatement("SELECT u_id FROM usr= ? AND pass = ?");
+        getID = conn.prepareStatement("SELECT uid FROM users where uid= ? AND password = ?");
 
-        createThread = conn.prepareStatement("INSERT INTO threads VALUES (?)", Statement.RETURN_GENERATED_KEYS);
-        getThreadID = conn.prepareStatement("SELECT t_id FROM threads WHERE t_name = ?");
+        createThread = conn.prepareStatement("INSERT INTO threads (`tname`) VALUES (?)", Statement.RETURN_GENERATED_KEYS);
+        getThreadID = conn.prepareStatement("SELECT tid FROM threads WHERE tname = ?");
 
-        registerUser = conn.prepareStatement("INSERT INTO  users VALUES (?)", Statement.RETURN_GENERATED_KEYS);
+        registerUser = conn.prepareStatement("INSERT INTO  users (`password`) VALUES (?)", Statement.RETURN_GENERATED_KEYS);
     }
 
     /**
@@ -105,8 +106,10 @@ public class ReaderFactory extends ShutDownThread {
             SocketChannel socket = (SocketChannel) key.channel();
             Message message = null;
 
+            System.out.println("Got a socket to read from");
             try {
                 message = messageFactory.readFrom(socket);
+                System.out.println("new message is: " + message.getType());
 
                 //get the proper handler
                 switch (message.getType()) {
@@ -131,9 +134,12 @@ public class ReaderFactory extends ShutDownThread {
                 onReadError.accept(key, message, e);
                 e.printStackTrace();
             }
+            System.out.println("redoing ops");
             //reset the ops
-            key.interestOps(keyOps);
-
+            key.interestOps(key.interestOps() | keyOps);
+            System.out.println("The key is writable : " + key.interestOps() + key.isWritable());
+            System.out.println("waking up the selector");
+            key.selector().wakeup();
         };
     }
 
@@ -144,6 +150,7 @@ public class ReaderFactory extends ShutDownThread {
      * @param message that was received by a socket
      */
     private void disconnect(SelectionKey key, Message message) throws IOException {
+        System.out.println("disconnecting a user");
 //        Message m = messageFactory.newInstance(message.getType(), message.getSenderID(), message.getPassword(), message.getThreadID(), message.getThreadName(), "Goodbye");
 //        mailBoxes.putMessageInBox(m.getSenderID(), m);
         mailBoxes.removeMailBox(message.getSenderID());
@@ -159,20 +166,26 @@ public class ReaderFactory extends ShutDownThread {
      * @throws SQLException if a database update could not be done
      */
     private void registerUser(SelectionKey key, Message message) throws SQLException {
+        System.out.println("registering a user");
         int id;
         //create an entry of the user in the database
         synchronized (registerUser) {
             registerUser.setString(1, message.getPassword());
+            registerUser.executeUpdate();
+
             ResultSet rs = registerUser.getGeneratedKeys();
             rs.next();
             id = rs.getInt(1);
             rs.close();
         }
+        //create a new mail box for the newly registered user
+        key.attach(new ConcurrentLinkedQueue<>());
+        mailBoxes.newMailBox(id, key);
+
         //sends a message to the client with their id
         Message m = messageFactory.newInstance(message.getType(), id, message.getPassword(), message.getThreadID(), message.getThreadName(), message.getContents());
-        mailBoxes.newMailBox(id, key);
         mailBoxes.putMessageInBox(id, m);
-        key.attach(new ConcurrentLinkedQueue<>());
+
     }
 
     /**
@@ -186,6 +199,7 @@ public class ReaderFactory extends ShutDownThread {
      * @throws IOException  If an I/O error occur with the socket
      */
     private void connectUser(SelectionKey key, Message message) throws SQLException, IOException {
+        System.out.println("Connecting user");
         int id;
         ResultSet rs;
         //get an id for the client
@@ -221,6 +235,7 @@ public class ReaderFactory extends ShutDownThread {
      * @throws SQLException If a database related error occurs
      */
     private void relayMessage(Message message) throws SQLException {
+        System.out.println("relaying a message");
         int senderID = message.getSenderID();
         //check if the sender has identified himself
         if (mailBoxes.thereIsBoxOf(senderID)) {
@@ -259,6 +274,7 @@ public class ReaderFactory extends ShutDownThread {
      * @throws SQLException If a database related error occurs
      */
     private void createThread(Message message) throws SQLException {
+        System.out.println("creating a thread");
         String threadName = message.getContents();
         boolean tryCreating = false;
         int threadID = 0;
