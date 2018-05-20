@@ -1130,6 +1130,7 @@
     <column id="283" parent="277" name="m_time">
       <Position>4</Position>
       <DataType>datetime|0s</DataType>
+      <NotNull>1</NotNull>
       <ColumnKind>normal</ColumnKind>
     </column>
     <index id="284" parent="277" name="uid">
@@ -1138,7 +1139,8 @@
     <key id="285" parent="277" name="PRIMARY">
       <NameSurrogate>1</NameSurrogate>
       <ColNames>tid
-uid</ColNames>
+uid
+m_time</ColNames>
       <Primary>1</Primary>
     </key>
     <foreign-key id="286" parent="277" name="messages_ibfk_1">

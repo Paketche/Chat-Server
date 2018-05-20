@@ -150,7 +150,7 @@ public class SimpleMessage implements Message, MessageFactory {
 
     @Override
     public int getThreadID() {
-        return threadID;
+        return header.getShort(threadID);
     }
 
     /**

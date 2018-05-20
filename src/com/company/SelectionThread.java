@@ -56,14 +56,14 @@ public class SelectionThread extends ShutDownThread {
     public void run() {
         System.out.println("Selection thread started");
         try {
-            for (int i = 0; i < 10; i++) {
-                registerSockets();
-                doSelection();
-            }
-//            while (isRunning()) {
+//            for (int i = 0; i < 10; i++) {
 //                registerSockets();
 //                doSelection();
 //            }
+            while (isRunning()) {
+                registerSockets();
+                doSelection();
+            }
 
             handlers.shutdown();
             selector.close();

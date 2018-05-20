@@ -184,14 +184,10 @@ public class ReaderFactory extends ShutDownThread {
             id = rs.getInt(1);
             rs.close();
         }
-        //create a new mail box for the newly registered user
-        key.attach(new ConcurrentLinkedQueue<>());
-        mailBoxes.newMailBox(id, key);
 
         //sends a message to the client with their id
         Message m = messageFactory.newInstance(message.getType(), id, message.getPassword(), message.getThreadID(), message.getThreadName(), message.getContents());
         mailBoxes.putMessageInBox(id, m);
-
     }
 
     /**

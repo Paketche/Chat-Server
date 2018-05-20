@@ -18,17 +18,18 @@ public class Client {
     private SocketChannel socket;
     private InetSocketAddress serverAddress;
     private MessageFactory factory;
+    private boolean disconnected;
 
 
     public Client(int id, InetSocketAddress serverAddr, MessageFactory mFact) {
-this.senderID = id;
+        this.senderID = id;
         this.serverAddress = serverAddr;
         this.factory = mFact;
+
     }
 
     public void start() throws IOException {
         socket = SocketChannel.open();
-
     }
 
     public void connect(String password) throws IOException {
@@ -74,6 +75,10 @@ this.senderID = id;
         socket.close();
     }
 
+    public void sendMeesage(String contents) throws IOException {
+        Message message = factory.newInstance(MessageType.SEND, senderID, noContent, threadID, noContent, contents);
+        message.sendTo(socket);
+    }
 
     public static void main(String[] args) {
         Scanner input = new Scanner(System.in);
@@ -82,7 +87,6 @@ this.senderID = id;
         Client client = new Client(47, new InetSocketAddress("localhost", 8080), factory);
 
         try {
-
             client.start();
             System.out.println("connecting client");
             client.connect("smtp");
@@ -95,6 +99,8 @@ this.senderID = id;
                 String line = input.nextLine();
                 if (!client.isStillWorking() || line.equals("quit"))
                     break;
+
+                client.sendMeesage(line);
             }
 
             System.out.println("disconnecting");
