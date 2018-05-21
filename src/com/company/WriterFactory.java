@@ -61,12 +61,10 @@ public class WriterFactory {
             } finally {
                 System.out.println("just wrote all messages and turning on ops except 'write'");
                 //turn off the writing ops since there are no messages to be written
-                synchronized (key) {
-                    if (key.isValid()) {
-                        key.interestOps(keyOps & ~SelectionKey.OP_WRITE);
-                        System.out.println("Key ops: " + key.interestOps());
-                        key.selector().wakeup();
-                    }
+                if (key.isValid()) {
+                    key.interestOps(keyOps & ~SelectionKey.OP_WRITE);
+                    System.out.println("Key ops: " + key.interestOps());
+                    key.selector().wakeup();
                 }
             }
         };

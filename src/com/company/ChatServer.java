@@ -26,7 +26,7 @@ public class ChatServer extends ShutDownThread {
      * Selector for receiving evens for being ready
      * for reading or writing
      */
-    private SelectionThread selectionThread;
+    private ServerSelectionThread selectionThread;
 
     /**
      * Number of simultaneous worker threads
@@ -118,7 +118,7 @@ public class ChatServer extends ShutDownThread {
         //init executor service and selector thread
         Selector selector = Selector.open();
         ExecutorService messageHandlers = Executors.newFixedThreadPool(workersNum);
-        selectionThread = new SelectionThread(selector, messageHandlers);
+        selectionThread = new ServerSelectionThread(selector, messageHandlers);
 
         // provide on read and on write commands for the selector
         selectionThread.onReading(readers::readFrom);

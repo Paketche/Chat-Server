@@ -75,7 +75,7 @@ public class ReaderFactory extends ShutDownThread {
         Connection conn = DriverManager.getConnection(connection, user, password);
         System.out.println("Got connection");
 
-        getParticipants = conn.prepareStatement("SELECT uid FROM messages WHERE tid = ? AND uid != ?");
+        getParticipants = conn.prepareStatement("SELECT DISTINCT uid FROM messages WHERE tid = ? AND uid != ?");
         saveMessage = conn.prepareStatement("INSERT INTO messages VALUES(?,?,?,?)");
         getID = conn.prepareStatement("SELECT uid FROM users where uid= ? AND password = ?");
 
@@ -135,16 +135,21 @@ public class ReaderFactory extends ShutDownThread {
             } catch (IOException | SQLException e) {
                 onReadError.accept(key, message, e);
                 e.printStackTrace();
+                if (key.isValid()) {
+                    try {
+                        key.channel().close();
+                    } catch (IOException e1) {
+                        onReadError.accept(key, message, e);
+                    }
+                }
             }
             System.out.println("redoing ops");
             //reset the ops
-            synchronized (key) {
-                if (key.isValid()) {
-                    key.interestOps(key.interestOps() | keyOps);
-                    System.out.println("The key is writable : " + key.interestOps() + key.isWritable());
-                    System.out.println("waking up the selector");
-                    key.selector().wakeup();
-                }
+            if (key.isValid()) {
+                key.interestOps(key.interestOps() | keyOps);
+                System.out.println("The key is writable : " + key.interestOps() + key.isWritable());
+                System.out.println("waking up the selector");
+                key.selector().wakeup();
             }
         };
     }
@@ -167,7 +172,6 @@ public class ReaderFactory extends ShutDownThread {
     /**
      * Registers users by putting their name in the database
      *
-     * @param key     of the new client
      * @param message of registration
      * @throws SQLException if a database update could not be done
      */
@@ -184,6 +188,10 @@ public class ReaderFactory extends ShutDownThread {
             id = rs.getInt(1);
             rs.close();
         }
+        //now create a new ArrayDeque so that it gets attached to the selection key
+        key.attach(new ConcurrentLinkedQueue<>());
+        //create a new mailbox for the client and put it with the mail boxes
+        mailBoxes.newMailBox(id, key);
 
         //sends a message to the client with their id
         Message m = messageFactory.newInstance(message.getType(), id, message.getPassword(), message.getThreadID(), message.getThreadName(), message.getContents());
@@ -338,7 +346,8 @@ public class ReaderFactory extends ShutDownThread {
         mailBoxes.putMessageInBox(senderIDid, m);
         System.out.println("Thread id is: " + m.getThreadID());
 
-        saveMessage(senderIDid, threadID, message.getDate(), helloMess);
+        if (tryCreating)
+            saveMessage(senderIDid, threadID, message.getDate(), helloMess);
     }
 
     /**

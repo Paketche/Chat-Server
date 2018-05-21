@@ -82,8 +82,10 @@ public class MailOffice {
         receivers.stream()
                 .map(boxNo_to_Key::get)
                 .filter(Objects::nonNull)
-                .forEach(key ->
-                        putMessageInBox(key, message)
+                .forEach(key ->{
+                            System.out.println("key is null" + key == null);
+                            putMessageInBox(key, message);
+                        }
                 );
     }
 
@@ -112,6 +114,6 @@ public class MailOffice {
         System.out.println("setting ops to writable");
         //turn on write interest
         key.interestOps(key.interestOps() | SelectionKey.OP_WRITE);
-        System.out.println("The key is writable : "+ key.interestOps());
+        System.out.println("The key is writable : " + key.interestOps());
     }
 }
