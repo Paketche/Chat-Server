@@ -58,7 +58,7 @@ the thread's selector is woken up. Once the pending sockets are registered the t
   </ul>
   Any exceptions raised by the reader lead to the disconenction fo the client.</p>
   
-   <p><strong>Writing thread:</strong> takes in a channel that is ready to be written to and uses the attach to the Selection key queue to write each one of the messages to the socket. the thread synchronizes on each message since one message is reference by multiples message queues and the message's buffer variables a are critical to the sending
+   <p><strong>Writing thread(s):</strong> takes in a channel that is ready to be written to and uses the attach to the Selection key queue to write each one of the messages to the socket. the thread synchronizes on each message since one message is reference by multiples message queues and the message's buffer variables a are critical to the sending
    After the messages are sent the ops flag for wringing is removed from the key.</p>
 
 
