@@ -4,108 +4,115 @@ import com.company.*;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
+import java.util.NoSuchElementException;
 import java.util.Scanner;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CountDownLatch;
 
-public class Client {
+public class Client implements Runnable {
 
-    private Selector selector;
-    private ClientSelectionThread selectorThread;
+    private ReadingThread readingThread;
+
+    private CountDownLatch awaitConnection;
+    private CountDownLatch awaitThread;
 
     private static String noContent = "";
     private static int unknownThread = 0;
 
-    private int senderID = 0;
-    private int threadID = 0;
+    private volatile int senderID = -1;
+    private volatile int threadID = -1;
+
     private SocketChannel socket;
     private InetSocketAddress serverAddress;
     private MessageFactory factory;
     private boolean disconnected;
 
-    private ConcurrentLinkedQueue<Message> outQueue;
+    private Scanner input;
+
+    private boolean loggedin;
 
 
-    public Client(int id, InetSocketAddress serverAddr, MessageFactory mFact) throws IOException {
-        this.senderID = id;
+    public Client(InetSocketAddress serverAddr, MessageFactory mFact) {
+
         this.serverAddress = serverAddr;
         this.factory = mFact;
 
         disconnected = true;
-        selector = Selector.open();
-        selectorThread = new ClientSelectionThread(selector);
-        this.outQueue = new ConcurrentLinkedQueue<>();
-
-        selectorThread.onReading((key, o) -> () -> {
-            try {
-                Message m = factory.readFrom((SocketChannel) key.channel());
-                System.out.println(m.getSenderID() + "." + m.getThreadID() + ": " + m.getContents());
-            } catch (IOException e) {
-                System.out.println("Sorry something happened: " + e.getMessage());
-            }
-        });
-
-        selectorThread.onWriting((k, ops) -> () -> {
-            try {
-                Message m;
-                while ((m = outQueue.poll()) != null) {
-                    m.sendTo(socket);
-                }
-            } catch (IOException e) {
-                try {
-                    socket.close();
-                } catch (IOException e1) {
-                    System.out.println("Sorry something happened: " + e.getMessage());
-                }
-                System.out.println("Sorry something happened: " + e.getMessage());
-            } finally {
-                if (k.isValid()) k.interestOps(ops & ~SelectionKey.OP_WRITE);
-            }
-        });
+        input = new Scanner(System.in);
+        awaitConnection = new CountDownLatch(1);
+        awaitThread = new CountDownLatch(1);
     }
 
     public void start() throws IOException {
         socket = SocketChannel.open();
-        selectorThread.registerSocket(socket);
-        selectorThread.start();
-    }
-
-    public void connect(String password) throws IOException {
         if (disconnected) {
             socket.connect(serverAddress);
             disconnected = false;
         }
-        Message message = factory.newInstance(MessageType.CONNECT, senderID, password, unknownThread, noContent, noContent);
-        message.sendTo(socket);
+        readingThread = new ReadingThread(socket, factory);
 
-        message = factory.readFrom(socket);
-        System.out.println("IDs" + (message.getSenderID() == senderID ? "" : "don't") + " match");
+        readingThread.onReceivingASendMessage(m ->
+                System.out.println(m.getSenderID() + "." + m.getThreadID() + ": " + m.getContents())
+        );
+
+        readingThread.onReceivingConnectMessage(m -> {
+            // signal that you've got a connect message
+            System.out.println("waking up connection latch");
+            awaitConnection.countDown();
+            this.senderID = m.getSenderID();
+        });
+
+        readingThread.onReceivingNewThreadMessage(m -> {
+            //signal that you've got a thread message
+            awaitThread.countDown();
+            this.threadID = m.getThreadID();
+        });
+
+        readingThread.onReceivingAFailureMessage(m -> {
+            // in cases of failed connection or thread obtaining
+            awaitThread.countDown();
+            awaitConnection.countDown();
+            System.out.println(m.getContents());
+        });
+
+        readingThread.onReceivingARegisterMessage(m -> {
+            //when the we're waing for a registration
+            awaitConnection.countDown();
+            this.senderID = m.getSenderID();
+        });
+
+        readingThread.start();
     }
 
-    public void createThread(String threadName) throws IOException {
+    public void connect(int id, String password) throws IOException, InterruptedException {
+        //reuse latch
+        awaitConnection = new CountDownLatch(1);
+
+        Message message = factory.newInstance(MessageType.CONNECT, id, password, unknownThread, noContent, noContent);
+        message.sendTo(socket);
+        //wait for the connect message
+        awaitConnection.await();
+        System.out.println("woken up");
+    }
+
+    public void createThread(String threadName) throws IOException, InterruptedException {
+        //reuse latch
+        awaitThread = new CountDownLatch(1);
+
         Message message = factory.newInstance(MessageType.NEW_THREAD, senderID, noContent, unknownThread, threadName, noContent);
         message.sendTo(socket);
-
-        //get the id of the thread
-        message = factory.readFrom(socket);
-        threadID = message.getThreadID();
-        System.out.println("New thread id is: " + threadID);
+        //wait for the thread message
+        awaitThread.await();
     }
 
-    public void register(String password) throws IOException {
-        if (disconnected) {
-            socket.connect(serverAddress);
-            disconnected = false;
-        }
+    public void register(String password) throws IOException, InterruptedException {
+        //reuse latch
+        awaitConnection = new CountDownLatch(1);
         Message message = factory.newInstance(MessageType.REGISTER, senderID, password, 0, "", "");
         message.sendTo(socket);
 
-        //get response with id
-        message = factory.readFrom(socket);
-        senderID = message.getSenderID();
-        System.out.println("Sender ID: " + senderID);
+        //wait for the connect message
+        awaitConnection.await();
     }
 
     public boolean isStillWorking() {
@@ -119,64 +126,108 @@ public class Client {
     }
 
     public void stop() throws IOException, InterruptedException {
+        readingThread.shutDown();
+        readingThread.join();
         socket.close();
-        selectorThread.join();
     }
 
     public void sendMessage(String contents) throws IOException {
         Message message = factory.newInstance(MessageType.SEND, senderID, noContent, threadID, noContent, contents);
-        outQueue.add(message);
-
-        SelectionKey k = socket.keyFor(selector);
-        k.interestOps(k.interestOps() | SelectionKey.OP_WRITE);
-        selector.wakeup();
+        message.sendTo(socket);
     }
 
-    public static void main(String[] args) {
-        Scanner input = new Scanner(System.in);
-        MessageFactory factory = new SimpleMessage();
-        System.out.println("enter user id");
-        String userID = input.nextLine();
 
-        System.out.println("enter user password");
-        String pass = input.nextLine();
-
+    public void run() {
+        String line;
+        boolean connecting;
 
         try {
-            Client client = new Client(Integer.parseInt(userID), new InetSocketAddress("localhost", 8080), factory);
+            this.start();
+            while (!loggedin) {
+                System.out.println("Would you like to register or connect(type: 'register' or 'connect')");
+                line = input.nextLine();
+                switch (line) {
+                    case "connect":
+                        connecting = true;
+                        break;
+                    case "register":
+                        connecting = false;
+                        break;
+                    default:
+                        System.out.println("Unknown command");
+                        continue;
+                }
 
-            client.start();
-            System.out.println("enter register or connect");
-            String line = input.nextLine();
+                int id;
+                String pass;
 
-            if (line.equals("connect")) {
-                System.out.println("connecting client");
-                client.connect(pass);
-            } else if (line.equals("register")) {
-                System.out.println("Registering user");
-                client.register(pass);
-                System.out.println("Connecting user");
-                client.connect(pass);
+                if (!connecting) {
+                    pass = requestAndValidate("Enter a password( a new id would be given to you)", 8);
+                    if (pass == null) {
+                        continue;
+                    }
+
+                    this.register(pass);
+                    //depending or registration success(on successful login the id is set)
+                    if (senderID < 0) continue;
+                    else id = senderID;
+                } else {
+                    try {
+                        System.out.println("Enter user id:");
+                        id = input.nextInt();
+
+                        pass = requestAndValidate("Enter a password", 8);
+                        if (pass == null) {
+                            continue;
+                        }
+
+                    } catch (NoSuchElementException e) {
+                        System.out.println("Bad input");
+                        continue;
+                    }
+                }
+                this.connect(id, pass);
+                if (this.senderID < 0) {
+                    System.out.println("Connection failed");
+                    continue;
+                }
+                System.out.println("Connection successful");
+                loggedin = true;
             }
-
-            System.out.println("creating a thread");
-            client.createThread("some dumbo");
+            while (true) {
+                String name = requestAndValidate("Name the thread you want to join", 16);
+                if (name != null) {
+                    this.createThread(name);
+                    //successful thread request
+                    if (threadID > 0) break;
+                }
+            }
+            System.out.println("Chat await (to quit just type 'quit')");
 
             while (true) {
-                System.out.println("Enter message:");
                 line = input.nextLine();
-                if (!client.isStillWorking() || line.equals("quit"))
+                if (!isStillWorking() || line.equals("quit"))
                     break;
 
-                client.sendMessage(line);
+                sendMessage(line);
             }
 
             System.out.println("disconnecting");
-            client.disconnect();
-            client.stop();
+            disconnect();
+            stop();
         } catch (IOException | InterruptedException e) {
             System.out.println("Sorry something happened: " + e.getMessage());
         }
-        System.out.println("Bye.");
+    }
+
+    private String requestAndValidate(String request, int length) {
+        String pass;
+        System.out.println(request + "(must not be longer than " + length + " characters)");
+        pass = input.next();
+        if (pass.length() > length) {
+            System.out.println("input too long");
+            pass = null;
+        }
+        return pass;
     }
 }

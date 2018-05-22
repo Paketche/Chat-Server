@@ -3,11 +3,28 @@ package com.company;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.util.function.Consumer;
 
 /**
- * REpresents an implementation of a chat server message.
- * At the same time it's its own factory
+ * Represents an implementation of a chat server message.
+ * At the same time it's its own factory.
+ * <p>
+ * A simple implantation of the message interface.
+ * the message has a header that contains:
+ * <pre>
+ * message type(byte)
+ * message Length(int)
+ * senderID(byte)
+ * threadID(short)
+ * send date(contain as a timestamp (long))
+ * </pre>
+ * <p>
+ * the body contains optional field like a password or a chat thread name
+ * for when a thread is created or when a CONNECT message is sent
+ * <p>
+ * <p>
+ * The Class also doubles as it's own factory being able to create a message by reading from a socket channel
+ * or by filling in the fields in the new instance method. The method takes care of the optional fields
+ * if they are not needed
  */
 public class SimpleMessage implements Message, MessageFactory {
 
@@ -41,6 +58,9 @@ public class SimpleMessage implements Message, MessageFactory {
         this.body = body;
     }
 
+    /**
+     * Use for creating a factory for this message type
+     */
     public SimpleMessage() {
 
     }
@@ -71,12 +91,12 @@ public class SimpleMessage implements Message, MessageFactory {
         ByteBuffer body = ByteBuffer.allocate(messSize);
         switch (type) {
             case NEW_THREAD:
-                threadName = paddString(threadName, THREAD_NAME_SIZE);
+                threadName = padString(threadName, THREAD_NAME_SIZE);
                 body.put(threadName.getBytes());
                 break;
             case REGISTER:
             case CONNECT:
-                pass = paddString(pass, PASSWORD_SIZE);
+                pass = padString(pass, PASSWORD_SIZE);
                 body.put(pass.getBytes());
         }
         body.put(contents.getBytes());
@@ -238,8 +258,15 @@ public class SimpleMessage implements Message, MessageFactory {
         return new String(strInBytes);
     }
 
-    private String paddString(String tobepadded, int size) {
-        StringBuilder b = new StringBuilder(tobepadded);
+    /**
+     * used for padding of field of variable length
+     *
+     * @param tobepaded string to be padded
+     * @param size      to which it should be padded
+     * @return padded string
+     */
+    private String padString(String tobepaded, int size) {
+        StringBuilder b = new StringBuilder(tobepaded);
 
         while (b.length() < size) b.append(" ");
 

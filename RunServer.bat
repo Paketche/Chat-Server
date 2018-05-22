@@ -1,0 +1,1 @@
+java -classpath "bin";"libraries/mysql-connector-java-5.1.46.jar";. Main

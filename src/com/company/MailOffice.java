@@ -4,9 +4,13 @@ import java.nio.channels.SelectionKey;
 import java.util.*;
 
 /**
- * Provides a mapping between an integer and a selection key. It is expected that to the selection key
+ * Provides a mapping between an integer and a selection key.<br>
+ * It is expected that to the selection key a queue of messages it attached.
  */
 public class MailOffice {
+    /**
+     * Each mail box is used as a user id to it's selection key
+     */
     private final TreeMap<Integer, SelectionKey> boxNo_to_Key;
 
     /**
@@ -73,7 +77,8 @@ public class MailOffice {
     }
 
     /**
-     * Put a message in multiple boxes
+     * Put a message in multiple boxes.The keys if the users' where the message was put have their interest
+     * set to op_write
      *
      * @param message   that is to be put in the mail boxes
      * @param receivers the mail box numbers of the receivers
@@ -82,15 +87,16 @@ public class MailOffice {
         receivers.stream()
                 .map(boxNo_to_Key::get)
                 .filter(Objects::nonNull)
-                .forEach(key ->{
-                            System.out.println("key is null" + key == null);
+                .forEach(key -> {
+
                             putMessageInBox(key, message);
                         }
                 );
     }
 
     /**
-     * Puts a message in a mail box
+     * Puts a message in a mail box. The keys if the users' where the message was put have their interest
+     * set to op_write
      *
      * @param boxNo   of the box that the message is going to be put in
      * @param message that is to be put in a message box

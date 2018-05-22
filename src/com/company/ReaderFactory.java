@@ -71,10 +71,14 @@ public class ReaderFactory extends ShutDownThread {
     public ReaderFactory(String drivers, String connection, String user, String password, MessageFactory factory) throws SQLException, ClassNotFoundException {
         messageFactory = factory;
 
+        System.out.println("Connecting to database");
         Class.forName(drivers);
         Connection conn = DriverManager.getConnection(connection, user, password);
         System.out.println("Got connection");
 
+
+        // create the prepared statements
+        System.out.println("Preparing statements");
         getParticipants = conn.prepareStatement("SELECT DISTINCT uid FROM messages WHERE tid = ? AND uid != ?");
         saveMessage = conn.prepareStatement("INSERT INTO messages VALUES(?,?,?,?)");
         getID = conn.prepareStatement("SELECT uid FROM users where uid= ? AND password = ?");
@@ -90,7 +94,7 @@ public class ReaderFactory extends ShutDownThread {
      *
      * @param office to be used by the readers
      */
-    public void setMailOffice(MailOffice office) {
+    void setMailOffice(MailOffice office) {
         this.mailBoxes = office;
     }
 
@@ -108,11 +112,9 @@ public class ReaderFactory extends ShutDownThread {
             SocketChannel socket = (SocketChannel) key.channel();
             Message message = null;
 
-            System.out.println("Got a socket to read from");
+            System.out.println("Reading from a channel");
             try {
                 message = messageFactory.readFrom(socket);
-                System.out.println("new message is: " + message.getType());
-                Thread.currentThread().setName("Reading message: " + message.getType());
                 //get the proper handler
                 switch (message.getType()) {
                     case CONNECT:
@@ -133,22 +135,22 @@ public class ReaderFactory extends ShutDownThread {
                     case UNKNOWN:
                 }
             } catch (IOException | SQLException e) {
-                onReadError.accept(key, message, e);
-                e.printStackTrace();
+                if (onReadError != null) onReadError.accept(key, message, e);
+
+                //terminate the faulty socket
                 if (key.isValid()) {
                     try {
-                        key.channel().close();
+                        disconnect(key, e);
                     } catch (IOException e1) {
-                        onReadError.accept(key, message, e);
+                        if (onReadError != null) onReadError.accept(key, message, e);
                     }
                 }
             }
-            System.out.println("redoing ops");
+
             //reset the ops
             if (key.isValid()) {
+                System.out.println("Reinserting ops in the key");
                 key.interestOps(key.interestOps() | keyOps);
-                System.out.println("The key is writable : " + key.interestOps() + key.isWritable());
-                System.out.println("waking up the selector");
                 key.selector().wakeup();
             }
         };
@@ -157,15 +159,22 @@ public class ReaderFactory extends ShutDownThread {
     /**
      * Used when a client requests a disconnection from the selector and
      *
-     * @param key     readable
      * @param message that was received by a socket
      */
     private void disconnect(SelectionKey key, Message message) throws IOException {
-        System.out.println("disconnecting a user");
-//        Message m = messageFactory.newInstance(message.getType(), message.getSenderID(), message.getPassword(), message.getThreadID(), message.getThreadName(), "Goodbye");
-//        mailBoxes.putMessageInBox(m.getSenderID(), m);
-        System.out.println("!!!!!!!!!!!!!!!!!!!!!    Canceling key !!!!!!!!!!!!!!!!!!!!!!!!!!");
+        System.out.println("Disconnecting a client");
+        //deallocate resources
         mailBoxes.removeMailBox(message.getSenderID());
+        key.channel().close();
+    }
+
+    /**
+     * Used when reading from a client error occurs so we deallocate their resources
+     */
+    private void disconnect(SelectionKey key, Exception e) throws IOException {
+        System.out.println("Disconnecting a client due to failure: " + e.getMessage());
+        //deallocate resources
+        mailBoxes.removeMailBox(key);
         key.channel().close();
     }
 
@@ -176,17 +185,18 @@ public class ReaderFactory extends ShutDownThread {
      * @throws SQLException if a database update could not be done
      */
     private void registerUser(SelectionKey key, Message message) throws SQLException {
-        System.out.println("registering a user");
+        System.out.println("Registering a new user");
         int id;
         //create an entry of the user in the database
         synchronized (registerUser) {
             registerUser.setString(1, message.getPassword());
             registerUser.executeUpdate();
 
-            ResultSet rs = registerUser.getGeneratedKeys();
-            rs.next();
-            id = rs.getInt(1);
-            rs.close();
+            //get the auto incremented id
+            try (ResultSet rs = registerUser.getGeneratedKeys()) {
+                rs.next();
+                id = rs.getInt(1);
+            }
         }
         //now create a new ArrayDeque so that it gets attached to the selection key
         key.attach(new ConcurrentLinkedQueue<>());
@@ -206,32 +216,27 @@ public class ReaderFactory extends ShutDownThread {
      * @param key     of the connecting client
      * @param message connection message
      * @throws SQLException If a database related error occurs
-     * @throws IOException  If an I/O error occur with the socket
      */
-    private void connectUser(SelectionKey key, Message message) throws SQLException, IOException {
-        System.out.println("Connecting user");
+    private void connectUser(SelectionKey key, Message message) throws SQLException {
+        System.out.println("Connecting a user");
         int id;
-        ResultSet rs;
+
         //get an id for the client
         try {
             synchronized (getID) {
                 System.out.println("id: " + message.getSenderID() + " password: " + message.getPassword());
                 getID.setInt(1, message.getSenderID());
                 getID.setString(2, message.getPassword());
-                rs = getID.executeQuery();
 
-                rs.next();
-                id = rs.getInt(1);
-
-                rs.close();
+                //querying the database to see if the combination exist
+                try (ResultSet rs = getID.executeQuery()) {
+                    rs.next();
+                    id = rs.getInt(1);
+                }
             }
-        } catch (SQLException | IndexOutOfBoundsException e) {
+        } catch (IndexOutOfBoundsException e) {
             //In case the query fails or the client hasn't passed in the correct number of arguments
-            System.out.println("!!!!!!!!!!!!!!!!!!!!!    Canceling key !!!!!!!!!!!!!!!!!!!!!!!!!!");
-
-            key.channel().close();
-            e.printStackTrace();
-            throw e;
+            throw new SQLException();
         }
 
         //now create a new ArrayDeque so that it gets attached to the selection key
@@ -252,7 +257,7 @@ public class ReaderFactory extends ShutDownThread {
      * @throws SQLException If a database related error occurs
      */
     private void relayMessage(Message message) throws SQLException {
-        System.out.println("relaying a message");
+        System.out.println("Relaying a message");
         int senderID = message.getSenderID();
         //check if the sender has identified himself
         if (!mailBoxes.thereIsBoxOf(senderID)) {
@@ -266,22 +271,26 @@ public class ReaderFactory extends ShutDownThread {
             getParticipants.setInt(1, message.getThreadID());
             getParticipants.setInt(2, senderID);
 
-            ResultSet rs = getParticipants.executeQuery();
-            getParticipants.clearParameters();
+            //get the ids of the clients that are in the same thread
+            try (ResultSet rs = getParticipants.executeQuery()) {
+                getParticipants.clearParameters();
 
-            //collect the ids of the participants
-            while (rs.next()) {
-                participantIds.add(rs.getInt(1));
+                //collect the ids of the participants
+                while (rs.next()) {
+                    participantIds.add(rs.getInt(1));
+                }
             }
-            rs.close();
         }
 
-        //put the message in each receiver's mail box
-        mailBoxes.putMessageInBoxes(message, participantIds);
-
-
-        //save the message into the database
-        saveMessage(message.getSenderID(), message.getThreadID(), message.getDate(), message.getContents());
+        try {
+            //save the message into the database
+            saveMessage(message.getSenderID(), message.getThreadID(), message.getDate(), message.getContents());
+            //put the message in each receiver's mail box
+            mailBoxes.putMessageInBoxes(message, participantIds);
+        } catch (SQLException e) {
+            // in case the client send a message with an unknown sender id or thread id this break database strains
+            sendFailingMessage(message.getSenderID(), "the message could not be delivered");
+        }
     }
 
     /**
@@ -291,7 +300,7 @@ public class ReaderFactory extends ShutDownThread {
      * @throws SQLException If a database related error occurs
      */
     private void createThread(Message message) throws SQLException {
-        System.out.println("creating a thread");
+
         String threadName = message.getThreadName();
         boolean tryCreating = false;
         int threadID = 0;
@@ -300,15 +309,16 @@ public class ReaderFactory extends ShutDownThread {
         synchronized (getThreadID) {
             try {
                 System.out.println("searching for thread");
-                getThreadID.setString(1, message.getThreadName());
-                ResultSet rs = getThreadID.executeQuery();
 
-                rs.next();
-                threadID = rs.getByte(1);
-                rs.close();
+                getThreadID.setString(1, message.getThreadName());
+                try (ResultSet rs = getThreadID.executeQuery();) {
+                    rs.next();
+                    threadID = rs.getInt(1);
+                }
+
+                System.out.println("Retrieving a chat thread id for a client");
             } catch (SQLException e) {
-                System.out.println("thread not found");
-                // the thread does not exist in the database
+                // the thread does not exist in the database so create it
                 tryCreating = true;
             }
         }
@@ -318,34 +328,30 @@ public class ReaderFactory extends ShutDownThread {
             try {
                 synchronized (createThread) {
                     //create it
-                    System.out.println("Creating new thread");
                     createThread.setString(1, threadName);
                     createThread.executeUpdate();
                     createThread.clearParameters();
 
                     //get the newly generated id
-                    ResultSet rs = createThread.getGeneratedKeys();
-                    rs.next();
-                    threadID = rs.getInt(1);
-                    rs.close();
-                    System.out.println("thread created");
+                    try(ResultSet rs = createThread.getGeneratedKeys()){
+                        rs.next();
+                        threadID = rs.getInt(1);
+                    }
                 }
+                System.out.println("Creating a new chat thread for a user");
             } catch (SQLException e) {
                 sendFailingMessage(message.getSenderID(), "Failed to create the thread");
-                e.printStackTrace();
-                throw e;
             }
         }
 
         //save the message in the database
         int senderIDid = message.getSenderID();
 
-
         //send the message with the id to the new thread
         Message m = messageFactory.newInstance(MessageType.NEW_THREAD, senderIDid, "", threadID, threadName, "");
         mailBoxes.putMessageInBox(senderIDid, m);
-        System.out.println("Thread id is: " + m.getThreadID());
 
+        //if a new thread was created join the user to it
         if (tryCreating)
             saveMessage(senderIDid, threadID, message.getDate(), helloMess);
     }
@@ -366,6 +372,8 @@ public class ReaderFactory extends ShutDownThread {
      * @param message  to be sent to the to the client
      */
     private void sendFailingMessage(int senderID, String message) {
+        System.out.println("Sending a failure message to user. ID:" + senderID + " message:" + message);
+
         Message m = messageFactory.newInstance(MessageType.FAILURE, senderID, "", 0, "", message);
         mailBoxes.putMessageInBox(senderID, m);
     }
@@ -381,7 +389,6 @@ public class ReaderFactory extends ShutDownThread {
      */
     private void saveMessage(int senderID, int threadID, long date, String contents) throws SQLException {
         synchronized (saveMessage) {
-
             Timestamp sqlDate = new Timestamp(date);
             saveMessage.setInt(1, threadID);
             saveMessage.setInt(2, senderID);

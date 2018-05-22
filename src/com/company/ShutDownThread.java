@@ -13,9 +13,9 @@ import java.util.Date;
  * A Thread with the ability to receive shutdown signals.<br>
  * Any class inheriting this thread could have
  * this construction in it's code:<br/>
- * <BLOCKQUOTE>
+ * <pre>
  * {@code while(isRunning()){ //do something }}
- * </BLOCKQUOTE>
+ * </pre>
  * When the execution comes back around the loop would be exited meaning
  * that the thread is shutting down
  */

@@ -24,7 +24,6 @@ public class WriterFactory {
     public Runnable writeTo(SelectionKey key, int keyOps) {
         return () -> {
             Thread.currentThread().setName("Writing message");
-            System.out.println("Got a key to write to " + Thread.currentThread().getName() + ". And it is valid" + key.isValid());
 
             //get a user's queue
             Queue<Message> queue = (Queue<Message>) key.attachment();
@@ -32,12 +31,9 @@ public class WriterFactory {
             //if the user has been terminated do nothing more
             //other classes will take care of it
             if (queue == null) {
-                System.out.println("there is no queue");
                 return;
             }
 
-
-            System.out.println("getting channel");
             SocketChannel socketChannel = (SocketChannel) key.channel();
             Message m = null;
 
@@ -45,25 +41,21 @@ public class WriterFactory {
             try {
                 //stop if the queue is empty
 
-                System.out.println("trying to poll");
                 while ((m = queue.poll()) != null) {
 
-                    System.out.println("Message is of type: " + m.getType() + ": " + m.getContents());
-                    System.out.println("sending to channel");
+                    //so that if one message is to be sent to multiple recipients only one could send it at a time
                     synchronized (m) {
+                        System.out.println("Sending a message; Type: " + m.getType() + " Sender: " + m.getSenderID() + " Contents: " + m.getContents());
                         m.sendTo(socketChannel);
                     }
-                    System.out.println("just wrote a message");
                 }
             } catch (IOException e) {
                 onWriteError.accept(key, m, e);
-                e.printStackTrace();
             } finally {
-                System.out.println("just wrote all messages and turning on ops except 'write'");
                 //turn off the writing ops since there are no messages to be written
                 if (key.isValid()) {
+                    System.out.println("Reinserting the key ops. (excluding the writing op)");
                     key.interestOps(keyOps & ~SelectionKey.OP_WRITE);
-                    System.out.println("Key ops: " + key.interestOps());
                     key.selector().wakeup();
                 }
             }

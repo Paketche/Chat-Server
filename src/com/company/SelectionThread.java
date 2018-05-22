@@ -1,6 +1,4 @@
-package com.company.client;
-
-import com.company.ShutDownThread;
+package com.company;
 
 import java.io.IOException;
 import java.nio.channels.SelectionKey;
@@ -9,6 +7,15 @@ import java.nio.channels.SocketChannel;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.BiFunction;
 
+/**
+ * Class for watching over many connections.<br>
+ * New Sockets to be registered and monitored could use the registerSocket method.
+ * <p>
+ * The class provide the specification of handlers when a key is selected. Handling could be on
+ * either reading or writing. There is no default handlers in place
+ * <p>
+ * Extensions of the class need to specify how the selection would be done
+ */
 public abstract class SelectionThread extends ShutDownThread {
 
     /**
@@ -51,11 +58,10 @@ public abstract class SelectionThread extends ShutDownThread {
      * Goes through the queue of waiting sockets and registers them
      */
     protected void registerSockets() {
-        System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!there is " + registerQueue.size() + " sockets to register");
         if (!registerQueue.isEmpty()) {
-            System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!registering new sockets");
             SocketChannel chan;
             while ((chan = registerQueue.poll()) != null) {
+                System.out.println(Thread.currentThread().getName() + ": registering a new socket");
                 try {
                     chan.configureBlocking(false);
                     chan.register(selector, SelectionKey.OP_READ);
@@ -69,6 +75,11 @@ public abstract class SelectionThread extends ShutDownThread {
         }
     }
 
+    /**
+     * Does the selection of the  keys
+     *
+     * @throws IOException if an error while selecting occurs
+     */
     protected abstract void doSelection() throws IOException;
 
     /**
@@ -94,14 +105,29 @@ public abstract class SelectionThread extends ShutDownThread {
         this.writable = function;
     }
 
+    /**
+     * Returns the selector
+     *
+     * @return the selector
+     */
     protected Selector selector() {
         return this.selector;
     }
 
+    /**
+     * Returns the set functionality on reading
+     *
+     * @return the set functionality on reading
+     */
     protected BiFunction<SelectionKey, Integer, Runnable> onReading() {
         return readable;
     }
 
+    /**
+     * Returns the set functionality on writing
+     *
+     * @return the set functionality on writing
+     */
     protected BiFunction<SelectionKey, Integer, Runnable> onWriting() {
         return writable;
     }
