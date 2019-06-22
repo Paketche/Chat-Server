@@ -33,7 +33,7 @@ the thread's selector is woken up. Once the pending sockets are registered the t
  <strong>Important:</strong> before executing the readers/writers  the ops of the selected keys are set to 0 so that it's impossible for a second thread to handle the same key</p>
  
  <p><strong>Reading thread(s):</strong> starts by creating a new message by reading it from the socket channel of the key. 
- After that depending on the <cod>MessageType</code> of the message it's serviced appropriately
+ After that depending on the <code>MessageType</code> of the message it's serviced appropriately
   <ul>
     <li>
       <code>Messagetype.CONNECT</code> taking the sender id and password from the message the database is queried for a match. If there is a match,
