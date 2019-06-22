@@ -1,5 +1,7 @@
 package valchanov.georgi;
 
+import valchanov.georgi.messages.Message;
+
 import java.nio.channels.SelectionKey;
 import java.util.*;
 

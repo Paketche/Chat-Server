@@ -1,6 +1,8 @@
 package valchanov.georgi.client;
 
-import valchanov.georgi.*;
+import valchanov.georgi.messages.Message;
+import valchanov.georgi.messages.MessageFactory;
+import valchanov.georgi.messages.MessageType;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;

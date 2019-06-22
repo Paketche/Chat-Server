@@ -1,8 +1,7 @@
-package valchanov.georgi;
+package valchanov.georgi.messages;
 
 import java.io.IOException;
 import java.nio.channels.SocketChannel;
-import java.util.function.Consumer;
 
 /**
  * Represents a immutable message

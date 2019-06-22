@@ -1,6 +1,7 @@
 package valchanov.georgi;
 
-import java.io.IOException;
+import valchanov.georgi.messages.Message;
+
 import java.nio.channels.SelectionKey;
 
 

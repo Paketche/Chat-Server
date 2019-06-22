@@ -1,4 +1,4 @@
-package valchanov.georgi;
+package valchanov.georgi.messages;
 
 /**
  * Used to identify what type a message is.

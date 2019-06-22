@@ -1,6 +1,10 @@
 package valchanov.georgi;
 
 
+import valchanov.georgi.messages.Message;
+import valchanov.georgi.messages.MessageFactory;
+import valchanov.georgi.messages.MessageType;
+
 import java.io.IOException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;

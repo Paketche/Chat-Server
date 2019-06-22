@@ -1,7 +1,7 @@
 package valchanov.georgi.client;
 
-import valchanov.georgi.Message;
-import valchanov.georgi.MessageFactory;
+import valchanov.georgi.messages.Message;
+import valchanov.georgi.messages.MessageFactory;
 import valchanov.georgi.ShutDownThread;
 
 import java.io.IOException;

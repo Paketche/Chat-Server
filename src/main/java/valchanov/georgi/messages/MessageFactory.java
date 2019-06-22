@@ -1,4 +1,4 @@
-package valchanov.georgi;
+package valchanov.georgi.messages;
 
 import java.io.IOException;
 import java.nio.channels.SocketChannel;
