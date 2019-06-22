@@ -43,7 +43,6 @@ public class ServerSelectionThread extends SelectionThread {
 
 
     public void run() {
-        System.out.println("Selection thread started");
         try {
             while (isRunning()) {
                 registerSockets();
@@ -71,7 +70,6 @@ public class ServerSelectionThread extends SelectionThread {
 
         //else the selector what probably woken up for registration
         if (selected > 0) {
-            System.out.println(selected + " keys were selected");
             Iterator<SelectionKey> iterator = selector().selectedKeys().iterator();
             while (iterator.hasNext()) {
 
@@ -97,7 +95,6 @@ public class ServerSelectionThread extends SelectionThread {
                     //take the ops so that only one worker thread could work with the selection key
                     //and it doesn't get selected again
                     key.interestOps(0);
-                    System.out.println("Running handler");
                     handlers.execute(handler);
                 }
 

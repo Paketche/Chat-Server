@@ -72,7 +72,6 @@ public class ChatServer extends ShutDownThread {
 
     public void run() {
 
-        System.out.println("starting server");
         //try-catch for any kind of exception; it logs that exception
         try {
             try {
@@ -85,11 +84,10 @@ public class ChatServer extends ShutDownThread {
                 initSelector();
 
                 SocketChannel client;
-                System.out.println("Waiting for connections");
                 while (isRunning()) {
                     //accept a new client connection and register it to the selector
                     client = serverSocket.accept();
-                    System.out.println("A new client was connected");
+                    System.out.println("New connection was established");
                     selectionThread.registerSocket(client);
                 }
             } catch (IOException e) {
@@ -122,7 +120,6 @@ public class ChatServer extends ShutDownThread {
         selectionThread.onWriting(writers::writeTo);
 
         selectionThread.start();
-        System.out.println("starting selector");
     }
 
     /**

@@ -56,7 +56,6 @@ public class WriterFactory {
             } finally {
                 //turn off the writing ops since there are no messages to be written
                 if (key.isValid()) {
-                    System.out.println("Reinserting the key ops. (excluding the writing op)");
                     key.interestOps(keyOps & ~SelectionKey.OP_WRITE);
                     key.selector().wakeup();
                 }

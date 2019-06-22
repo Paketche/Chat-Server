@@ -1,1 +1,1 @@
-java -cp bin ClientDriver
+java -cp build/classes/java/main valchanov.georgi.drivers.ClientDriver localhost 8080

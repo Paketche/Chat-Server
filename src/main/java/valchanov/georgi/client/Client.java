@@ -11,16 +11,15 @@ import java.util.NoSuchElementException;
 import java.util.Scanner;
 import java.util.concurrent.CountDownLatch;
 
+import static java.lang.System.out;
+
 public class Client implements Runnable {
-
-    private ReadingThread readingThread;
-
-    private CountDownLatch awaitConnection;
-    private CountDownLatch awaitThread;
 
     private static String noContent = "";
     private static int unknownThread = 0;
-
+    private ReadingThread readingThread;
+    private CountDownLatch awaitConnection;
+    private CountDownLatch awaitThread;
     private volatile int senderID = -1;
     private volatile int threadID = -1;
 
@@ -54,12 +53,12 @@ public class Client implements Runnable {
         readingThread = new ReadingThread(socket, factory);
 
         readingThread.onReceivingASendMessage(m ->
-                System.out.println(m.getSenderID() + "." + m.getThreadID() + ": " + m.getContents())
+                out.printf("sender: %d room: %d message: %s\n", m.getSenderID(), m.getThreadID(), m.getContents())
         );
+
 
         readingThread.onReceivingConnectMessage(m -> {
             // signal that you've got a connect message
-            System.out.println("waking up connection latch");
             awaitConnection.countDown();
             this.senderID = m.getSenderID();
         });
@@ -74,13 +73,14 @@ public class Client implements Runnable {
             // in cases of failed connection or thread obtaining
             awaitThread.countDown();
             awaitConnection.countDown();
-            System.out.println(m.getContents());
+            out.println(m.getContents());
         });
 
         readingThread.onReceivingARegisterMessage(m -> {
             //when the we're waing for a registration
             awaitConnection.countDown();
             this.senderID = m.getSenderID();
+            out.printf("registered with ID: %d\n", m.getSenderID());
         });
 
         readingThread.start();
@@ -94,7 +94,6 @@ public class Client implements Runnable {
         message.sendTo(socket);
         //wait for the connect message
         awaitConnection.await();
-        System.out.println("woken up");
     }
 
     public void createThread(String threadName) throws IOException, InterruptedException {
@@ -146,7 +145,7 @@ public class Client implements Runnable {
         try {
             this.start();
             while (!loggedin) {
-                System.out.println("Would you like to register or connect(type: 'register' or 'connect')");
+                out.println("Would you like to register or connect(type: 'register' or 'connect')");
                 line = input.nextLine();
                 switch (line) {
                     case "connect":
@@ -156,7 +155,7 @@ public class Client implements Runnable {
                         connecting = false;
                         break;
                     default:
-                        System.out.println("Unknown command");
+                        out.println("Unknown command");
                         continue;
                 }
 
@@ -175,7 +174,7 @@ public class Client implements Runnable {
                     else id = senderID;
                 } else {
                     try {
-                        System.out.println("Enter user id:");
+                        out.println("Enter user id:");
                         id = input.nextInt();
 
                         pass = requestAndValidate("Enter a password", 8);
@@ -184,16 +183,16 @@ public class Client implements Runnable {
                         }
 
                     } catch (NoSuchElementException e) {
-                        System.out.println("Bad input");
+                        out.println("Bad input");
                         continue;
                     }
                 }
                 this.connect(id, pass);
                 if (this.senderID < 0) {
-                    System.out.println("Connection failed");
+                    out.println("Connection failed");
                     continue;
                 }
-                System.out.println("Connection successful");
+                out.println("Connection successful");
                 loggedin = true;
             }
             while (true) {
@@ -204,7 +203,7 @@ public class Client implements Runnable {
                     if (threadID > 0) break;
                 }
             }
-            System.out.println("Chat await (to quit just type 'quit')");
+            out.println("Chat away (to quit just type 'quit')");
 
             while (true) {
                 line = input.nextLine();
@@ -214,20 +213,20 @@ public class Client implements Runnable {
                 sendMessage(line);
             }
 
-            System.out.println("disconnecting");
+            out.println("disconnecting");
             disconnect();
             stop();
         } catch (IOException | InterruptedException e) {
-            System.out.println("Sorry something happened: " + e.getMessage());
+            out.println("Sorry something happened: " + e.getMessage());
         }
     }
 
     private String requestAndValidate(String request, int length) {
         String pass;
-        System.out.println(request + "(must not be longer than " + length + " characters)");
+        out.println(request + "(must not be longer than " + length + " characters)");
         pass = input.next();
         if (pass.length() > length) {
-            System.out.println("input too long");
+            out.println("input too long");
             pass = null;
         }
         return pass;

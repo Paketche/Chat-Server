@@ -45,16 +45,15 @@ public class Logger {
             // get the time of the crash
             builder.append(dateFormat.format(new Date())).append(" ").append(e.getMessage())
                     .append(System.getProperty("line.separator"));
-        }
-        try {
-            // append at the end of the file
-            synchronized (logFile) {
-                Files.write(logFile, builder.toString().getBytes(), StandardOpenOption.APPEND);
+            try {
+                // append at the end of the file
+                synchronized (logFile) {
+                    Files.write(logFile, builder.toString().getBytes(), StandardOpenOption.APPEND);
+                }
+            } catch (IOException e1) {
+                // well i really don't know what to do here
+                e1.printStackTrace();
             }
-        } catch (IOException e1) {
-            // well i really don't know what to do here
-            e1.printStackTrace();
         }
-
     }
 }

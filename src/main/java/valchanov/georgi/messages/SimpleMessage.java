@@ -1,8 +1,4 @@
-package valchanov.georgi;
-
-import valchanov.georgi.messages.Message;
-import valchanov.georgi.messages.MessageFactory;
-import valchanov.georgi.messages.MessageType;
+package valchanov.georgi.messages;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;

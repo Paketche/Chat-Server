@@ -1,1 +1,10 @@
-##log file
+##log file2019.06.22 AD at 16:15:22 EEST An existing connection was forcibly closed by the remote host
+2019.06.22 AD at 16:20:46 EEST An existing connection was forcibly closed by the remote host
+2019.06.22 AD at 16:54:59 EEST ResultSet closed
+2019.06.22 AD at 17:34:48 EEST An existing connection was forcibly closed by the remote host
+2019.06.22 AD at 17:37:11 EEST An existing connection was forcibly closed by the remote host
+2019.06.22 AD at 17:39:32 EEST An existing connection was forcibly closed by the remote host
+2019.06.22 AD at 17:39:37 EEST An existing connection was forcibly closed by the remote host
+2019.06.22 AD at 17:53:03 EEST An existing connection was forcibly closed by the remote host
+2019.06.22 AD at 17:53:11 EEST An existing connection was forcibly closed by the remote host
+2019.06.22 AD at 17:53:17 EEST An existing connection was forcibly closed by the remote host

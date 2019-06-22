@@ -108,7 +108,7 @@ public class MailOffice {
         putMessageInBox(boxNo_to_Key.get(boxNo), message);
     }
 
-    private void putMessageInBox(SelectionKey key, Message message) throws IllegalArgumentException {
+    public void putMessageInBox(SelectionKey key, Message message) throws IllegalArgumentException {
         //add a message to the queue of the key and set it up for writing
         Queue<Message> mailBox;
         try {
@@ -119,9 +119,7 @@ public class MailOffice {
 
         mailBox.add(message);
 
-        System.out.println("setting ops to writable");
         //turn on write interest
         key.interestOps(key.interestOps() | SelectionKey.OP_WRITE);
-        System.out.println("The key is writable : " + key.interestOps());
     }
 }
