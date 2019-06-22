@@ -1,4 +1,4 @@
-package com.company;
+package valchanov.georgi;
 
 import java.nio.channels.SelectionKey;
 import java.util.*;

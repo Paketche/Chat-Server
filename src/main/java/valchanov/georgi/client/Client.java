@@ -1,6 +1,6 @@
-package com.company.client;
+package valchanov.georgi.client;
 
-import com.company.*;
+import valchanov.georgi.*;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;

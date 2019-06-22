@@ -1,4 +1,4 @@
-package com.company;
+package valchanov.georgi;
 
 /**
  * Used to identify what type a message is.

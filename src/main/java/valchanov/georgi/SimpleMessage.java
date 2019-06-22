@@ -1,4 +1,4 @@
-package com.company;
+package valchanov.georgi;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;

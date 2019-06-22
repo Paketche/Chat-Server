@@ -1,8 +1,8 @@
-package com.company.client;
+package valchanov.georgi.client;
 
-import com.company.Message;
-import com.company.MessageFactory;
-import com.company.ShutDownThread;
+import valchanov.georgi.Message;
+import valchanov.georgi.MessageFactory;
+import valchanov.georgi.ShutDownThread;
 
 import java.io.IOException;
 import java.nio.channels.SelectionKey;
