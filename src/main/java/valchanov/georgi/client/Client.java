@@ -59,28 +59,29 @@ public class Client implements Runnable {
 
         readingThread.onReceivingConnectMessage(m -> {
             // signal that you've got a connect message
-            awaitConnection.countDown();
             this.senderID = m.getSenderID();
+            awaitConnection.countDown();
         });
 
         readingThread.onReceivingNewThreadMessage(m -> {
             //signal that you've got a thread message
-            awaitThread.countDown();
             this.threadID = m.getThreadID();
+            awaitThread.countDown();
         });
 
         readingThread.onReceivingAFailureMessage(m -> {
             // in cases of failed connection or thread obtaining
+            out.println(m.getContents());
             awaitThread.countDown();
             awaitConnection.countDown();
-            out.println(m.getContents());
         });
 
         readingThread.onReceivingARegisterMessage(m -> {
             //when the we're waing for a registration
-            awaitConnection.countDown();
+
             this.senderID = m.getSenderID();
             out.printf("registered with ID: %d\n", m.getSenderID());
+            awaitConnection.countDown();
         });
 
         readingThread.start();
@@ -144,8 +145,12 @@ public class Client implements Runnable {
 
         try {
             this.start();
+            boolean falseRead = false;
             while (!loggedin) {
-                out.println("Would you like to register or connect(type: 'register' or 'connect')");
+                if (!falseRead) {
+                    out.println("Would you like to register or connect(type: 'register' or 'connect')");
+                    falseRead = true;
+                }
                 line = input.nextLine();
                 switch (line) {
                     case "connect":
@@ -154,6 +159,10 @@ public class Client implements Runnable {
                     case "register":
                         connecting = false;
                         break;
+                    case "":
+                        out.print("\b");
+                        falseRead = false;
+                        continue;
                     default:
                         out.println("Unknown command");
                         continue;
@@ -210,7 +219,8 @@ public class Client implements Runnable {
                 if (!isStillWorking() || line.equals("quit"))
                     break;
 
-                sendMessage(line);
+                if (!line.equals(""))
+                    sendMessage(line);
             }
 
             out.println("disconnecting");

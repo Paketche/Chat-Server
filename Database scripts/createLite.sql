@@ -4,7 +4,7 @@ create table users
     password text not null
 );
 
-create table threads
+create table rooms
 (
     tid   integer autoincrement primary key,
     tname text not null
@@ -17,6 +17,6 @@ create table messages
     m_cont text    null,
     m_time text    not null,
     primary key (tid, uid, m_time),
-    foreign key (tid) references threads (tid),
+    foreign key (tid) references rooms (tid),
     foreign key (uid) references users (uid)
 );

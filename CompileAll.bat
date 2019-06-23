@@ -1,2 +1,1 @@
-mkdir bin
-javac -d ./bin -cp ./src ./src/*.java
+gradle build
